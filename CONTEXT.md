@@ -13,7 +13,7 @@ units, caption, …), with **no client script and no runtime state**. It *shows*
 a vector relationship once, the way a figure in a textbook does. It does not
 react to the learner.
 
-- Canonical component: `src/components/VectorField.astro`.
+- Canonical component: `src/components/VectorGrid.astro`.
 - Lifecycle: SSR-only; the markup is final at build time.
 - Does **not** use vanjs. (See [Interactive playground](#interactive-playground).)
 

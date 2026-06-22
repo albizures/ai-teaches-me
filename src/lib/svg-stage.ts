@@ -1,24 +1,24 @@
-// SVG drawing primitives for a 2D "stage" (a square `<svg>` with the origin at
-// its center, +x right, +y DOWN — see CONTEXT.md: "coordinate convention —
-// y-down").
-//
-// Pure DOM helpers, no van. The interactive playgrounds mount these calls
-// inside `van.derive` so the redraw is reactive; a future static diagram can
-// call them imperatively at SSR/build time instead. Either way, this file
-// is the single home for the grid-units → screen-pixels mapping and for the
-// "arrow / dot / circle" atoms shared across playgrounds and diagrams.
-//
-// Under ADR-0001: stage chrome that *never changes* (grid lines, axes) lives
-// in the `.astro` template, not here; only the atoms that get repeated into
-// dynamic layers belong in this lib.
-
+import van, { type TagFunc } from "vanjs-core";
 import type { Vec } from "./vec";
 
 const NS = "http://www.w3.org/2000/svg";
 
-type Pt = { x: number; y: number };
+// `van.tags(NS)` returns one tag function per element name, each creating an
+// SVG element in the right namespace. Destructured once so every atom below
+// reads as `line({...})`, `circle({...})`, etc. The namespaced overload of
+// `van.tags` is typed only as `TagFunc<Element>` (no SVGElementTagNameMap
+// narrowing), so we cast to per-tag result types for decent call-site types.
+const { line, text, circle, g } = van.tags(NS) as unknown as {
+  line: TagFunc<SVGLineElement>;
+  text: TagFunc<SVGTextElement>;
+  circle: TagFunc<SVGCircleElement>;
+  g: TagFunc<SVGGElement>;
+};
 
-/** Create an SVG element with attributes set. */
+
+/** Create an SVG element with attributes set. Pure-DOM escape hatch used by
+ * playgrounds for the occasional ad-hoc element outside the stage API (kept
+ * generic/typed, unlike the loosely-typed van namespace record). */
 export function mk<K extends keyof SVGElementTagNameMap>(
   name: K,
   attrs: Record<string, string> = {},
@@ -28,10 +28,6 @@ export function mk<K extends keyof SVGElementTagNameMap>(
   return el;
 }
 
-const styleApply = (el: SVGElement, s: Record<string, string>) => {
-  for (const [k, v] of Object.entries(s)) (el.style as unknown as Record<string, string>)[k] = v;
-};
-
 /** Remove every child of `layer`. */
 export function clear(layer: Node & ParentNode): void {
   while (layer.firstChild) layer.removeChild(layer.firstChild);
@@ -39,13 +35,20 @@ export function clear(layer: Node & ParentNode): void {
 
 export interface ArrowOpts {
   width?: number;
-  dashed?: boolean;
-  label?: string;
+  dashed?: boolean | undefined;
+  label?: string | undefined;
+}
+
+export interface PointOpts {
+  /** Stroke/fill radius in pixels. Defaults to 5. */
+  radius?: number | undefined;
+  /** Optional text label drawn next to the dot. */
+  label?: string | undefined;
 }
 
 export interface Stage {
   /** Map a grid-unit Vec to screen-pixel coordinates. */
-  pt(v: Vec): Pt;
+  pt(v: Vec): Vec;
   arrow(
     layer: SVGGElement,
     from: Vec,
@@ -53,12 +56,22 @@ export interface Stage {
     color: string,
     opts?: ArrowOpts,
   ): void;
+  /** Draw a non-interactive filled dot at a point with an optional label.
+   * Unlike `dot`, this is a static marker — no `data-handle`, no tabindex,
+   * no grab cursor — meant for diagrams that *show* a position rather than
+   * invite dragging. */
+  point(
+    layer: SVGGElement,
+    p: Vec,
+    color: string,
+    opts?: PointOpts,
+  ): void;
   dot(
     layer: SVGGElement,
     p: Vec,
     color: string,
     handle: string,
-    label: string,
+    label?: string,
   ): void;
   /** Draw a plain (unfilled, dashed, low-opacity) circle centered at the
    * origin, with radius given in *grid units* (multiplied by the stage's
@@ -66,78 +79,131 @@ export interface Stage {
   circlePlain(layer: SVGGElement, radiusUnits: number, color: string): void;
 }
 
-/**
- * Build a stage bound to a particular `<svg>` geometry. `markerId` is the
- * `<defs>` marker id used for arrowheads (passed in so a page with multiple
- * playgrounds doesn't collide).
- */
 export function makeStage(
   cx: number,
   cy: number,
   pxPerUnit: number,
   markerId: string,
 ): Stage {
-  const pt = (v: Vec): Pt => ({ x: cx + v.x * pxPerUnit, y: cy + v.y * pxPerUnit });
+  const pt = (v: Vec): Vec => ({ x: cx + v.x * pxPerUnit, y: cy + v.y * pxPerUnit });
   return {
     pt,
     arrow(layer, from, to, color, opts = {}) {
       const a = pt(from), b = pt(to);
-      const line = mk("line", {
-        x1: String(a.x), y1: String(a.y),
-        x2: String(b.x), y2: String(b.y),
-        stroke: color,
-        "stroke-width": String(opts.width ?? 3),
-        "stroke-linecap": "round",
-        "marker-end": `url(#${markerId})`,
-      });
-      // Style stroke too, so the context-stroke arrowhead fill tracks the arrow color.
-      styleApply(line, { stroke: color });
-      if (opts.dashed) line.setAttribute("stroke-dasharray", "5 4");
-      layer.appendChild(line);
-      if (opts.label) {
-        const t = mk("text", {
-          x: String(b.x + 6), y: String(b.y - 4),
-          "font-size": "12", "font-family": "monospace",
-        });
-        t.textContent = opts.label;
-        styleApply(t, { fill: color });
-        layer.appendChild(t);
-      }
+    
+      van.add(layer, g({},
+        line({
+          x1: a.x, y1: a.y,
+          x2: b.x, y2: b.y,
+          stroke: color,
+          "stroke-width": opts.width ?? 3,
+          "stroke-linecap": "round",
+          "style":`stroke: ${color};`,
+          'stroke-dasharray': opts.dashed ?  '5 4': null,
+          "marker-end": `url(#${markerId})`,
+        }),
+        Label({
+          label: opts.label,
+          color,
+          x: (a.x + b.x) /2 , y: (a.y +b.y)/ 2 - 6
+        })
+      ));
+    },
+    point(layer, p, color, opts = {}) {
+      const sp = pt(p);
+      const r = opts.radius ?? 5;
+
+      van.add(layer, g({}, 
+        circle({
+          cx: sp.x, cy: sp.y, r,
+          style: style([
+            ['fill', color],
+            ['stroke', 'var(--color-base-100, #fff)'],
+            ['stroke-width', "2px"],
+          ])
+        }),
+        Label({
+          label: opts.label,
+          color,
+          x: sp.x + r + 4, y: sp.y + 4
+        })
+      ));
     },
     dot(layer, p, color, handle, label) {
       const sp = pt(p);
-      const c = mk("circle", {
-        cx: String(sp.x), cy: String(sp.y), r: "9",
-        "data-handle": handle, tabindex: "0",
-      });
-      styleApply(c, {
-        fill: color,
-        stroke: "var(--color-base-100, #fff)",
-        strokeWidth: "2px",
-        cursor: "grab",
-      });
-      layer.appendChild(c);
-      const t = mk("text", {
-        x: String(sp.x + 11), y: String(sp.y + 4),
-        "font-size": "12", "font-family": "monospace",
-      });
-      t.textContent = label;
-      styleApply(t, { fill: color, pointerEvents: "none" });
-      layer.appendChild(t);
+
+      van.add(layer, g({}, 
+        circle({
+          cx: sp.x, cy: sp.y, r: 9,
+          "data-handle": handle, tabindex: 0,
+          style: style([
+            ['fill', color],
+            ['stroke', "var(--color-base-100, #fff)"],
+            ['stroke-width', "2px"],
+            ['cursor', "grab"],
+          ])
+        }),
+        Label({
+          label,
+          color,
+          x: sp.x + 11, y: sp.y + 4,
+        })
+      ));
     },
     circlePlain(layer, radiusUnits, color) {
       const radiusPx = radiusUnits * pxPerUnit;
-      const c = mk("circle", {
-        cx: String(cx), cy: String(cy), r: String(radiusPx),
-      });
-      styleApply(c, {
-        fill: "none",
-        stroke: color,
-        strokeWidth: "1px",
-        strokeDasharray: "3 3",
-        opacity: "0.5",
-      });
-      layer.appendChild(c);
+   
+      van.add(layer, circle({
+        cx,
+        cy,
+        r: radiusPx,
+        class: 'fill-none stroke-1 opacity-50',
+        style: style([
+          ['stroke', color],
+          [' stroke-dasharray', '3 3']
+        ])
+      }));
     },
   };
+}
+
+type LabelProps = {
+  label?: string | undefined,
+  x: number, y: number
+  color: string,
+}
+
+function Label(props: LabelProps) {
+  const { label, x, y, color } = props;
+
+  if (!label) {
+    return undefined
+  }
+
+   return  text({ x, y,
+      "font-size": 12,
+      "font-family": "monospace",
+      style: style([
+        ['fill', color],
+        ['pointer-events', 'none'],
+      ])
+    },
+      label,
+    );
+}
+
+type StyleItem = [string, string | undefined | number]
+
+function style(items: Array<StyleItem>) {
+  let result = '';
+
+  for (const [name, value] of items) {
+    if (value === undefined) {
+      continue
+    }
+
+    result = `${result};${name}: ${value}`;
+  }
+
+  return result
 }

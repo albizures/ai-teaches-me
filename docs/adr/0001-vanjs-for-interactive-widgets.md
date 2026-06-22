@@ -15,7 +15,7 @@ readout). Structure: one stateful `Playground` controller owning all
 `k`) and all input handlers; two presentational leaves (`ResultView`,
 `Readout`) computing shapes/text purely from derived state. A `src/lib/`
 substrate (`vec.ts`, `svg-stage.ts`) holds the domain math and the y-down
-SVG mapping so future widgets and `VectorField.astro` can share them.
+SVG mapping so future widgets and `VectorGrid.astro` can share them.
 
 ## Considered Options
 
@@ -55,3 +55,10 @@ SVG mapping so future widgets and `VectorField.astro` can share them.
   (`statesToGc`) handles disconnected bindings. This preserves a latent
   cross-navigation listener leak that already existed pre-refactor — kept
   deliberately to minimize behavioral change.
+- **Mount mechanism:** the random per-instance id + `data-vop` + `initAll()`
+  scoping used here is **not** the house style for *new* widgets.
+  ADR-0002 sets the forward rule — mount interactive widgets as custom
+  elements so per-instance logic is scoped by the DOM boundary instead of
+  by author-minted unique ids. This component is grandfathered by ADR-0002
+  with explicit migration debt; see ADR-0002 before adding or touching an
+  interactive widget.

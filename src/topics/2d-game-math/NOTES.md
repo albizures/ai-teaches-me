@@ -23,7 +23,7 @@
 10. Capstone: steering & aiming (seek/flee, line-of-sight, targeting)
 
 ## Teaching style notes
-- **Visual examples by default** (learner preference). Pair every new concept with an SVG diagram or a small interactive widget — e.g. `VectorField.astro` for static diagrams, `VectorOpsPlayground.astro` for draggable interactivity. Don't ship a concept as prose-only if a picture can carry it.
+- **Visual examples by default** (learner preference). Pair every new concept with an SVG diagram or a small interactive widget — e.g. `VectorGrid.astro` for static diagrams, `VectorOpsPlayground.astro` for draggable interactivity. Don't ship a concept as prose-only if a picture can carry it.
 - Keep each lesson to one tight win; stay in working memory.
 - Show the concept → show the Odin/raylib code → give a small interactive check → prompt a follow-up question.
 - Always cite a high-trust source per lesson.
