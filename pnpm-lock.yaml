@@ -23,6 +23,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.1
         version: 4.3.1
+      vanjs-core:
+        specifier: ^1.6.0
+        version: 1.6.0
     devDependencies:
       '@types/node':
         specifier: ^26.0.0
@@ -1751,6 +1754,9 @@ packages:
         optional: true
       uploadthing:
         optional: true
+
+  vanjs-core@1.6.0:
+    resolution: {integrity: sha512-4KM9mKEji7woioytMNKQ2XrqD31ykG9vde3N1F/gyJJ0oaOSohdeaN2o4UC4Ndu3Raj1SEXWvW7k4etZI8Ovjw==}
 
   vfile-location@5.0.3:
     resolution: {integrity: sha512-5yXvWDEgqeiYiBe1lbxYF7UMAIm/IcopxMHrMQDq3nvKcjPKIhZklUKL+AE7J7uApI4kwe2snsK+eI6UTj9EHg==}
@@ -3927,6 +3933,8 @@ snapshots:
       node-fetch-native: 1.6.7
       ofetch: 1.5.1
       ufo: 1.6.4
+
+  vanjs-core@1.6.0: {}
 
   vfile-location@5.0.3:
     dependencies:

@@ -10,8 +10,20 @@
 //   normalize -> A as a unit vector (length 1, same direction)
 //   distance -> straight line from A's tip to B's tip
 //
-// All deps: plain DOM + SVG. No framework. daisyUI classes for styling so it
-// follows the active theme.
+// Architecture (ADR-0001):
+//   - Static stage chrome (grid, axes, arrowhead <defs>) is SSR'd here in the
+//     `.astro` template. It never changes after mount.
+//   - The state-driven layers (result arrows, draggable handles, numeric
+//     read-out) are owned by a reactive `van`-tree mounted inside this shell.
+//   - A stateful `Playground` controller owns the `van.state` atoms
+//     (one `Vec` per vector, plus `op` and `k`) and all input handlers
+//     (drag, op-tab click, k-slider). Two presentational leaves
+//     (`ResultView`, `Readout`) compute their output purely from derived state.
+//   - Domain math comes from `src/lib/vec.ts`; SVG primitives and the y-down
+//     grid-unit -> screen-pixel mapping come from `src/lib/svg-stage.ts`.
+//
+// See CONTEXT.md (interactive playground, coordinate convention: y-down) and
+// docs/adr/0001-vanjs-for-interactive-widgets.md.
 type Props = {
   size?: number;
   units?: number;
@@ -22,15 +34,24 @@ const {
 } = Astro.props;
 
 const px = size;
-const scale = (px / 2 - 18) / units;
+const pxScale = (px / 2 - 18) / units;
+const cx = px / 2;
+const cy = px / 2;
 const id = `vop-${Math.random().toString(36).slice(2, 9)}`;
+
+// One grid line per integer unit, plus the centered axes. Static markup only.
+const gridRange = Array.from({ length: units * 2 + 1 }, (_, i) => i - units);
+const sx = (g: number) => cx + g * pxScale;
+const sy = (g: number) => cy + g * pxScale;
+const axisColor = "color-mix(in oklch, currentColor 45%, transparent)";
+const gridColor = "color-mix(in oklch, currentColor 12%, transparent)";
 ---
 
 <div
   class="not-prose my-6 p-4 rounded-box border border-base-content/15 bg-base-200/30"
   data-vop={id}
   data-units={units}
-  data-scale={scale}
+  data-scale={pxScale}
   data-px={px}
 >
   <div class="flex flex-col lg:flex-row gap-4 items-start">
@@ -49,13 +70,23 @@ const id = `vop-${Math.random().toString(36).slice(2, 9)}`;
             <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
           </marker>
         </defs>
-        {/* grid */}
-        <g class="grid-layer" stroke="currentColor" stroke-width="1"></g>
-        {/* axes */}
-        <g class="axes-layer" stroke="currentColor" stroke-width="1.5"></g>
-        {/* result vector (drawn first so A/B sit on top) */}
+        {/* grid — static, SSR'd (never changes after mount) */}
+        <g class="grid-layer" stroke={gridColor} stroke-width="1">
+          {gridRange.map((g) => (
+            <line x1={sx(g)} y1="0" x2={sx(g)} y2={px} />
+          ))}
+          {gridRange.map((g) => (
+            <line x1="0" y1={sy(g)} x2={px} y2={sy(g)} />
+          ))}
+        </g>
+        {/* axes — static, SSR'd */}
+        <g class="axes-layer" stroke={axisColor} stroke-width="1.5">
+          <line x1={cx} y1="0" x2={cx} y2={px} />
+          <line x1="0" y1={cy} x2={px} y2={cy} />
+        </g>
+        {/* result vector (drawn first so A/B sit on top) — van-owned, mounted into this <g> */}
         <g class="result-layer"></g>
-        {/* A and B */}
+        {/* A and B handles — van-owned */}
         <g class="handles-layer" style="cursor: grab"></g>
       </svg>
       <p class="text-xs text-base-content/50 mt-1 text-center">
@@ -86,7 +117,7 @@ const id = `vop-${Math.random().toString(36).slice(2, 9)}`;
         </p>
       </div>
 
-      {/* numeric read-out */}
+      {/* numeric read-out — van-owned, mounted into this <div> */}
       <div class="font-mono text-sm bg-base-100 rounded-box p-3 border border-base-content/10 space-y-1" id={`${id}-readout`}>
       </div>
     </div>
@@ -94,244 +125,243 @@ const id = `vop-${Math.random().toString(36).slice(2, 9)}`;
 </div>
 
 <script>
-  function initVOP(root: HTMLElement) {
-    if (root.dataset.ready === "1") return;
-    root.dataset.ready = "1";
+  import van, { type State as VanState } from "vanjs-core";
+  import {
+    vec, add, sub, scale, length, normalize, distance, clamp, fmt,
+    type Vec,
+  } from "../lib/vec";
+  import { mk, clear, makeStage, type Stage } from "../lib/svg-stage";
 
-    const id = root.dataset.vop!;
-    const units = Number(root.dataset.units);
-    const scale = Number(root.dataset.scale);
-    const px = Number(root.dataset.px);
-    const cx = px / 2;
-    const cy = px / 2;
+  type Op = "add" | "subtract" | "scale" | "normalize" | "distance";
 
-    const COL = {
-      a: "oklch(0.7 0.18 30)",   // warm (A)
-      b: "oklch(0.65 0.16 220)",  // cool (B)
-      result: "var(--color-primary, oklch(0.7 0.18 330))",
-      muted: "var(--color-base-content, #888)",
-    };
+  const COL = {
+    a: "oklch(0.7 0.18 30)",   // warm (A)
+    b: "oklch(0.65 0.16 220)", // cool (B)
+    result: "var(--color-primary, oklch(0.7 0.18 330))",
+    muted: "var(--color-base-content, #888)",
+  };
 
-    // State (screen coords: +y is downward)
-    let A = { x: 2, y: 1 };
-    let B = { x: -1, y: 2 };
-    let op = "add";
-    let k = 2;
-
-    const gridLayer = root.querySelector<SVGGElement>(".grid-layer")!;
-    const axesLayer = root.querySelector<SVGGElement>(".axes-layer")!;
-    const resultLayer = root.querySelector<SVGGElement>(".result-layer")!;
-    const handlesLayer = root.querySelector<SVGGElement>(".handles-layer")!;
-    const readout = root.querySelector<HTMLElement>(`#${id}-readout`)!;
-    const opsBar = root.querySelector<HTMLElement>(`#${id}-ops`)!;
-    const scaleOnly = root.querySelector<HTMLElement>(".scale-only")!;
-    const kSlider = root.querySelector<HTMLInputElement>(`#${id}-k`)!;
-    const kVal = root.querySelector<HTMLElement>(`#${id}-kval`)!;
-
-    const s = (gx: number, gy: number) => ({ x: cx + gx * scale, y: cy + gy * scale });
-
-    const NS = "http://www.w3.org/2000/svg";
-    function mk<K extends keyof SVGElementTagNameMap>(name: K, attrs: Record<string, string> = {}): SVGElementTagNameMap[K] {
-      const el = document.createElementNS(NS, name);
-      for (const [k2, v2] of Object.entries(attrs)) el.setAttribute(k2, v2);
-      return el;
-    };
-
-    // build grid + axes once
-    const range = Array.from({ length: units * 2 + 1 }, (_, i) => i - units);
-    range.forEach((g) => {
-      const p1 = s(g, -units), p2 = s(g, units);
-      gridLayer.appendChild(mk("line", { x1: String(p1.x), y1: "0", x2: String(p2.x), y2: String(px) }));
-      gridLayer.appendChild(mk("line", { x1: "0", y1: String(s(0, g).y), x2: String(px), y2: String(s(0, g).y) }));
-    });
-    gridLayer.setAttribute("class", "grid-layer");
-    gridLayer.setAttribute("stroke", "currentColor");
-    gridLayer.style.color = "color-mix(in oklch, currentColor 12%, transparent)";
-    axesLayer.appendChild(mk("line", { x1: String(cx), y1: "0", x2: String(cx), y2: String(px) }));
-    axesLayer.appendChild(mk("line", { x1: "0", y1: String(cy), x2: String(px), y2: String(cy) }));
-    axesLayer.style.color = "color-mix(in oklch, currentColor 45%, transparent)";
-
-    function arrow(layer: SVGGElement, from: {x:number;y:number}, to: {x:number;y:number}, color: string, w = 3, dashed = false, label?: string) {
-      const a = s(from.x, from.y), b = s(to.x, to.y);
-      const line = mk("line", {
-        x1: String(a.x), y1: String(a.y), x2: String(b.x), y2: String(b.y),
-        "stroke": color, "stroke-width": String(w),
-        "stroke-linecap": "round",
-        "marker-end": `url(#${id}-ah)`,
-      });
-      if (dashed) line.setAttribute("stroke-dasharray", "5 4");
-      line.style.stroke = color;
-      // marker fill follows context-stroke; set stroke directly:
-      (line as any).style.stroke = color;
-      layer.appendChild(line);
-      if (label) {
-        const t = mk("text", {
-          x: String(b.x + 6), y: String(b.y - 4),
-          "font-size": "12", "font-family": "monospace",
-        });
-        t.textContent = label;
-        (t as any).style.fill = color;
-        layer.appendChild(t);
-      }
-    }
-
-    function dot(layer: SVGGElement, p: {x:number;y:number}, color: string, label: string) {
-      const sp = s(p.x, p.y);
-      const c = mk("circle", { cx: String(sp.x), cy: String(sp.y), r: "9" });
-      c.style.fill = color;
-      c.style.stroke = "var(--color-base-100, #fff)";
-      c.style.strokeWidth = "2";
-      c.style.cursor = "grab";
-      c.dataset.handle = label;
-      c.setAttribute("tabindex", "0");
-      layer.appendChild(c);
-      const t = mk("text", { x: String(sp.x + 11), y: String(sp.y + 4), "font-size": "12", "font-family": "monospace" });
-      t.textContent = label;
-      (t as any).style.fill = color;
-      (t as any).style.pointerEvents = "none";
-      layer.appendChild(t);
-    }
-
-    function clearLayer(layer: SVGGElement) { while (layer.firstChild) layer.removeChild(layer.firstChild); }
-
-    function length(v: {x:number;y:number}) { return Math.hypot(v.x, v.y); }
-    function fmt(n: number) { return (Math.round(n * 100) / 100).toString(); }
-
-    function render() {
-      clearLayer(resultLayer);
-      clearLayer(handlesLayer);
-      const O = { x: 0, y: 0 };
-      let lines: string[] = [];
+  // --- presentational leaf: the result arrows -------------------------------
+  // Reads state only; never writes. Redraws (imperatively, into a cleared
+  // `<g>`) whenever a state it reads changes. Variable structure per op is
+  // exactly why we wrap in a van.derive rather than bind attributes one-by-one.
+  function ResultView(stage: Stage, resultLayer: SVGGElement, get: VecState) {
+    const O = vec(0, 0);
+    van.derive(() => {
+      const A = get.A.val, B = get.B.val, op = get.op.val, k = get.k.val;
+      clear(resultLayer);
 
       if (op === "add") {
-        const sum = { x: A.x + B.x, y: A.y + B.y };
-        arrow(resultLayer, O, A, COL.a, 3, false, "A");
-        arrow(resultLayer, A, { x: A.x + B.x, y: A.y + B.y }, COL.b, 3, false, "B");
-        arrow(resultLayer, O, sum, COL.result, 4, true, "A+B");
+        const sum = add(A, B);
+        stage.arrow(resultLayer, O, A, COL.a, { label: "A" });
+        stage.arrow(resultLayer, A, sum, COL.b, { label: "B" });
+        stage.arrow(resultLayer, O, sum, COL.result, { width: 4, dashed: true, label: "A+B" });
+      } else if (op === "subtract") {
+        stage.arrow(resultLayer, O, A, COL.a, { label: "A" });
+        stage.arrow(resultLayer, O, B, COL.b, { label: "B" });
+        stage.arrow(resultLayer, A, B, COL.result, { width: 4, dashed: true, label: "B\u2212A" });
+      } else if (op === "scale") {
+        const scaled = scale(A, k);
+        stage.arrow(resultLayer, O, A, COL.a, { dashed: true, label: "A" });
+        stage.arrow(resultLayer, O, scaled, COL.result, { width: 4, label: `A\u00d7${fmt(k)}` });
+      } else if (op === "normalize") {
+        const l = length(A);
+        const n = normalize(A);
+        stage.arrow(resultLayer, O, A, COL.a, { dashed: true, label: `A |A|=${fmt(l)}` });
+        stage.arrow(resultLayer, O, n, COL.result, { width: 4, label: "\u00c2 (unit)" });
+        // unit circle marker
+        // unit circle: radius 1 grid unit. circlePlain converts to pixels via the stage mapping.
+        stage.circlePlain(resultLayer, 1, COL.result);
+      } else if (op === "distance") {
+        stage.arrow(resultLayer, O, A, COL.a, { label: "A" });
+        stage.arrow(resultLayer, O, B, COL.b, { label: "B" });
+        // underscore the line tip-to-tip with a dashed marker-less arrow.
+        const a = stage.pt(A), b = stage.pt(B);
+        const line = mk("line", {
+          x1: String(a.x), y1: String(a.y), x2: String(b.x), y2: String(b.y),
+          "stroke-dasharray": "5 4", "stroke-width": "4",
+        }) as SVGLineElement;
+        (line.style as unknown as Record<string, string>).stroke = COL.result;
+        line.setAttribute("marker-end", `url(#${get.markerId})`);
+        resultLayer.appendChild(line);
+      }
+    });
+  }
+
+  // --- presentational leaf: the numeric read-out ----------------------------
+  function Readout(readout: HTMLElement, get: VecState) {
+    van.derive(() => {
+      const A = get.A.val, B = get.B.val, op = get.op.val, k = get.k.val;
+      let lines: string[] = [];
+      if (op === "add") {
+        const sum = add(A, B);
         lines = [
           `A   = (${fmt(A.x)}, ${fmt(A.y)})   |A|=${fmt(length(A))}`,
           `B   = (${fmt(B.x)}, ${fmt(B.y)})   |B|=${fmt(length(B))}`,
           `A+B = (${fmt(sum.x)}, ${fmt(sum.y)})   |A+B|=${fmt(length(sum))}`,
         ];
       } else if (op === "subtract") {
-        // B - A is the vector from A's tip to B's tip
-        const diff = { x: B.x - A.x, y: B.y - A.y };
-        arrow(resultLayer, O, A, COL.a, 3, false, "A");
-        arrow(resultLayer, O, B, COL.b, 3, false, "B");
-        arrow(resultLayer, A, B, COL.result, 4, true, "B−A");
+        const diff = sub(B, A);
         lines = [
           `A   = (${fmt(A.x)}, ${fmt(A.y)})`,
           `B   = (${fmt(B.x)}, ${fmt(B.y)})`,
-          `B−A = (${fmt(diff.x)}, ${fmt(diff.y)})   |B−A|=${fmt(length(diff))}`,
-          `B−A points from A's tip to B's tip`,
+          `B\u2212A = (${fmt(diff.x)}, ${fmt(diff.y)})   |B\u2212A|=${fmt(length(diff))}`,
+          `B\u2212A points from A's tip to B's tip`,
         ];
       } else if (op === "scale") {
-        const scaled = { x: A.x * k, y: A.y * k };
-        arrow(resultLayer, O, A, COL.a, 3, true, "A");
-        arrow(resultLayer, O, scaled, COL.result, 4, false, `A×${fmt(k)}`);
+        const scaled = scale(A, k);
         lines = [
           `A      = (${fmt(A.x)}, ${fmt(A.y)})`,
           `k      = ${fmt(k)}`,
-          `A×k    = (${fmt(scaled.x)}, ${fmt(scaled.y)})`,
-          `|A×k|  = ${fmt(length(scaled))} (= |A|·|k| = ${fmt(length(A) * Math.abs(k))})`,
+          `A\u00d7k    = (${fmt(scaled.x)}, ${fmt(scaled.y)})`,
+          `|A\u00d7k|  = ${fmt(length(scaled))} (= |A|\u00b7|k| = ${fmt(length(A) * Math.abs(k))})`,
         ];
       } else if (op === "normalize") {
         const l = length(A);
-        const n = l > 0 ? { x: A.x / l, y: A.y / l } : { x: 0, y: 0 };
-        arrow(resultLayer, O, A, COL.a, 3, true, `A |A|=${fmt(l)}`);
-        arrow(resultLayer, O, n, COL.result, 4, false, "Â (unit)");
-        // also mark the unit circle
-        const c = mk("circle", { cx: String(cx), cy: String(cy), r: String(scale) });
-        c.style.fill = "none";
-        c.style.stroke = COL.result;
-        c.style.strokeWidth = "1";
-        c.style.strokeDasharray = "3 3";
-        c.style.opacity = "0.5";
-        resultLayer.appendChild(c);
+        const n = normalize(A);
         lines = [
           `A   = (${fmt(A.x)}, ${fmt(A.y)})   |A|=${fmt(l)}`,
-          `Â = A / |A| = (${fmt(n.x)}, ${fmt(n.y)})`,
-          `|Â| = ${fmt(length(n))}  (always 1)`,
+          `\u00c2 = A / |A| = (${fmt(n.x)}, ${fmt(n.y)})`,
+          `|\u00c2| = ${fmt(length(n))}  (always 1)`,
           `Dashed circle = radius 1 (the unit circle)`,
         ];
       } else if (op === "distance") {
-        arrow(resultLayer, O, A, COL.a, 3, false, "A");
-        arrow(resultLayer, O, B, COL.b, 3, false, "B");
-        const diff = { x: B.x - A.x, y: B.y - A.y };
-        // draw line between tips
-        const a = s(A.x, A.y), b = s(B.x, B.y);
-        const line = mk("line", { x1: String(a.x), y1: String(a.y), x2: String(b.x), y2: String(b.y), "stroke-dasharray": "5 4", "stroke-width": "3" });
-        line.style.stroke = COL.result;
-        line.setAttribute("marker-end", `url(#${id}-ah)`);
-        resultLayer.appendChild(line);
+        const d = distance(A, B);
         lines = [
           `A = (${fmt(A.x)}, ${fmt(A.y)})`,
           `B = (${fmt(B.x)}, ${fmt(B.y)})`,
-          `distance = |B − A| = ${fmt(length(diff))}`,
-          `(= sqrt(dx² + dy²), Pythagoras)`,
+          `distance = |B \u2212 A| = ${fmt(d)}`,
+          `(= sqrt(dx\u00b2 + dy\u00b2), Pythagoras)`,
         ];
       }
-
       readout.innerHTML = lines.map((l) => `<div>${l}</div>`).join("");
-      dot(handlesLayer, A, COL.a, "A");
-      dot(handlesLayer, B, COL.b, "B");
+    });
+  }
 
-      // tabs active state
-      opsBar.querySelectorAll<HTMLElement>('[role="tab"]').forEach((t) => {
-        t.classList.toggle("tab-active", t.dataset.op === op);
-      });
-      scaleOnly.classList.toggle("hidden", op !== "scale");
-    }
+  // --- bundle of (possibly) shared state accessors -------------------------
+  interface VecState {
+    A: VanState<Vec>;
+    B: VanState<Vec>;
+    op: VanState<Op>;
+    k: VanState<number>;
+    markerId: string;
+  }
 
-    // operation selection
+  // --- controller: owns state + input, mounts both leaves ------------------
+  function initVOP(root: HTMLElement) {
+    if (root.dataset.ready === "1") return;
+    root.dataset.ready = "1";
+
+    const id = root.dataset.vop!;
+    const units = Number(root.dataset.units);
+    const pxPerUnit = Number(root.dataset.scale);
+    const px = Number(root.dataset.px);
+    const cx = px / 2;
+    const cy = px / 2;
+    const markerId = `${id}-ah`;
+
+    const stage = makeStage(cx, cy, pxPerUnit, markerId);
+    // Optional TODO: cache radius mapping? pxPerUnit is used as "radius-1 unit" circle marker.
+
+    // State: one `van.state<Vec>` per vector (kept whole), plus `op` and `k`.
+    const A = van.state<Vec>(vec(2, 1));
+    const B = van.state<Vec>(vec(-1, 2));
+    const op = van.state<Op>("add");
+    const k = van.state<number>(2);
+
+    const get: VecState = { A, B, op, k, markerId };
+
+    const resultLayer = root.querySelector<SVGGElement>(".result-layer")!;
+    const handlesLayer = root.querySelector<SVGGElement>(".handles-layer")!;
+    const readout = root.querySelector<HTMLElement>(`#${id}-readout`)!;
+    const svg = root.querySelector<SVGSVGElement>(`#${id}-svg`)!;
+    const opsBar = root.querySelector<HTMLElement>(`#${id}-ops`)!;
+    const scaleOnly = root.querySelector<HTMLElement>(".scale-only")!;
+    const kSlider = root.querySelector<HTMLInputElement>(`#${id}-k`)!;
+    const kVal = root.querySelector<HTMLElement>(`#${id}-kval`)!;
+
+    // Mount the two presentational leaves.
+    ResultView(stage, resultLayer, get);
+    Readout(readout, get);
+
+    // Handles are owned by the controller: they're the drag input source, so
+    // pulling them into a child would mean passing setters back up — ceremony
+    // over clarity. Their *positions* still derive reactively from A/B.
+    //
+    // Invariant (ADR-0001 Q8): Vec atoms must be assigned a *fresh* Vec on
+    // every change.Vanjs dedups notifications by reference inequality, so
+    // `A.val.x = ...` (mutate in place) would silently skip this redraw.
+    van.derive(() => {
+      clear(handlesLayer);
+      stage.dot(handlesLayer, A.val, COL.a, "A", "A");
+      stage.dot(handlesLayer, B.val, COL.b, "B", "B");
+    });
+
+    // Tab-styling + slider visibility derive purely from `op`.
+    van.derive(() => {
+      const cur = op.val;
+      opsBar.querySelectorAll<HTMLElement>('[role="tab"]').forEach(
+        (t) => t.classList.toggle("tab-active", t.dataset.op === cur),
+      );
+      scaleOnly.classList.toggle("hidden", cur !== "scale");
+    });
+
+    // k-slider label derives purely from `k`.
+    van.derive(() => {
+      kVal.textContent = k.val.toFixed(1);
+    });
+
+    // ---- input handlers (the only writers of state) ----
     opsBar.addEventListener("click", (e) => {
-      const t = (e.target as HTMLElement).closest('[role="tab"]') as HTMLElement | null;
+      const t = (e.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
       if (!t) return;
-      op = t.dataset.op!;
-      render();
+      op.val = t.dataset.op as Op;
     });
     kSlider.addEventListener("input", () => {
-      k = Number(kSlider.value);
-      kVal.textContent = k.toFixed(1);
-      render();
+      k.val = Number(kSlider.value);
     });
 
-    // dragging handles
-    const svg = root.querySelector<SVGSVGElement>(`#${id}-svg`)!;
+    // ---- drag handles ----
     let dragging: "A" | "B" | null = null;
 
-    function toData(evt: PointerEvent) {
+    // grid-unit Vec under the pointer, clamped to the playable range.
+    const toData = (evt: PointerEvent): Vec => {
       const rect = svg.getBoundingClientRect();
-      const sx = ((evt.clientX - rect.left) / rect.width) * px;
-      const sy = ((evt.clientY - rect.top) / rect.height) * px;
-      const gx = (sx - cx) / scale;
-      const gy = (sy - cy) / scale;
-      // clamp to grid
-      const cl = (v: number) => Math.max(-units, Math.min(units, v));
-      return { x: cl(gx), y: cl(gy) };
-    }
+      const sxp = ((evt.clientX - rect.left) / rect.width) * px;
+      const syp = ((evt.clientY - rect.top) / rect.height) * px;
+      const gx = (sxp - cx) / pxPerUnit;
+      const gy = (syp - cy) / pxPerUnit;
+      return vec(clamp(gx, -units, units), clamp(gy, -units, units));
+    };
 
     svg.addEventListener("pointerdown", (e) => {
       const h = (e.target as Element).getAttribute?.("data-handle");
       if (h === "A" || h === "B") {
         dragging = h;
         svg.setPointerCapture(e.pointerId);
-        (e.target as Element).setAttribute("style", ((e.target as Element).getAttribute("style") || "") + ";cursor:grabbing;");
       }
     });
     svg.addEventListener("pointermove", (e) => {
       if (!dragging) return;
       const d = toData(e);
-      if (dragging === "A") A = d;
-      else B = d;
-      render();
+      // Always assign a fresh Vec (see invariant above). Drag SAS touches
+      // exactly one atom per event — see ADR-0001.
+      if (dragging === "A") A.val = d;
+      else B.val = d;
     });
-    svg.addEventListener("pointerup", (e) => { dragging = null; svg.releasePointerCapture?.(e.pointerId); });
+    svg.addEventListener("pointerup", (e) => {
+      dragging = null;
+      svg.releasePointerCapture?.(e.pointerId);
+    });
     svg.addEventListener("pointercancel", () => { dragging = null; });
-
-    render();
   }
 
+  // Lifecycle (L0 from ADR-0001 / the grilling session): keep today's pattern
+  // exactly — `initAll` runs on script load and again on `astro:page-load`
+  // (View Transitions), with `dataset.ready` guarding against a double mount
+  // of the same element. Listeners attach to elements inside this shell only
+  // (never `document`/`window`), so the module-level hook is the only
+  // document-level listener.
   function initAll() {
     document.querySelectorAll<HTMLElement>("[data-vop]").forEach(initVOP);
   }
