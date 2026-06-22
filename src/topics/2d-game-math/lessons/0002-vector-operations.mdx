@@ -1,0 +1,211 @@
+---
+title: "Vector Operations"
+description: "Add, subtract, scale, measure length, normalize, and find distance with raylib Vector2 — the handful of operations behind every movement and aiming line in your shooter."
+draft: false
+slug: 0002-vector-operations
+publicatedAt: 2026-06-21
+---
+
+import VectorField from '../../../components/VectorField.astro';
+import VectorOpsPlayground from '../../../components/VectorOpsPlayground.astro';
+import Quiz from '../../../components/Quiz.astro';
+
+In [lesson 1](./0001-coordinate-spaces-and-vectors) you used a `Vector2` as a
+position and a velocity. Now let's give that object a toolkit. Every movement,
+aim line, and range check in your shooter is built from just six operations —
+**add, subtract, scale, length, normalize, distance**. We'll meet each one with
+a picture, then the Odin code, then a playground you can drive yourself.
+
+## 1. Add — "do this, then that"
+
+Adding two vectors stacks their displacements. Geometrically this is the
+**tip-to-tail** rule: draw `A`, then draw `B` starting at the *tip* of `A`. The
+result `A + B` runs from the tail of `A` straight to the tip of `B`.
+
+<VectorField
+  vectors={[
+    { x: 3, y: 1, color: "oklch(0.7 0.18 30)", label: "A" },
+    { x: 1, y: 2, fromX: 3, fromY: 1, color: "oklch(0.65 0.16 220)", label: "B" },
+    { x: 4, y: 3, color: "var(--color-primary)", dashed: true, label: "A+B" },
+  ]}
+  caption="A (warm) and B (cool) laid tip-to-tail. The dashed result A+B closes the triangle from the origin."
+/>
+
+In your movement code this is exactly `position = position + velocity` from
+last lesson — each frame you *add* the velocity to the position. raylib-odin
+gives you `rl.Vector2Add`:
+
+```odin
+sum := rl.Vector2Add(a, b)        // a.x+b.x, a.y+b.y
+position = rl.Vector2Add(position, velocity)
+```
+
+## 2. Subtract — "the vector from A to B"
+
+`B - A` is the displacement that would carry you **from `A` to `B`**. Draw both
+vectors from the origin; the subtraction is the arrow that goes from the tip of
+`A` straight to the tip of `B`.
+
+<VectorField
+  vectors={[
+    { x: 3, y: 1, color: "oklch(0.7 0.18 30)", label: "A" },
+    { x: 1, y: 3, color: "oklch(0.65 0.16 220)", label: "B" },
+    { x: -2, y: 2, fromX: 3, fromY: 1, color: "var(--color-primary)", dashed: true, label: "B−A" },
+  ]}
+  caption="B − A starts at the tip of A and ends at the tip of B. This is how you get a 'toward the player' vector."
+/>
+
+This is the single most useful operation for AI and aiming. To make an enemy
+move **toward** the player you compute `direction = rl.Vector2Subtract(player_pos, enemy_pos)`
+— the vector "from enemy to player".
+
+```odin
+to_player := rl.Vector2Subtract(player.pos, enemy.pos)
+enemy.pos  = rl.Vector2Add(enemy.pos, to_player)   // roughly chases the player
+```
+
+(Don't run that last line verbatim yet — `to_player` can be huge. We'll tame it
+with **normalize** below.)
+
+## 3. Scale — "stretch or shrink"
+
+Multiplying a vector by a number `k` scales its length without changing its
+direction (when `k > 0`). `k > 1` stretches, `0 < k < 1` shrinks, and a
+**negative** `k` flips it.
+
+<VectorField
+  vectors={[
+    { x: 4, y: 2, color: "var(--color-primary)", label: "A×2" },// first the large one
+    { x: 2, y: 1, color: "oklch(0.7 0.18 30)", label: "A" },
+  ]}
+  caption="Scaling by 2 doubles both x and y — same direction, twice as long."
+/>
+
+```odin
+fast := rl.Vector2Scale(velocity, 2)   // (2*vx, 2*vy)
+half := rl.Vector2Scale(velocity, 0.5) // half as long
+flip := rl.Vector2Scale(velocity, -1)   // same length, opposite direction
+```
+
+Speed in your movement code is just `velocity` scaled by `dt` for
+frame-rate-independence (you'll meet that properly in lesson 5).
+
+## 4. Length — "how far is this vector?"
+
+The length (or magnitude) of a vector is its **straight-line distance from the
+origin**. By Pythagoras: `|v| = sqrt(x² + y²)`. Picture it as the hypotenuse of a
+right triangle with legs `x` and `y`.
+
+<VectorField
+  vectors={[
+    { x: 3, y: 0, color: "oklch(0.7 0.18 30)", label: "x" },
+    { x: 0, y: 4, fromX: 3, fromY: 0, color: "oklch(0.65 0.16 220)", label: "y" },
+    { x: 3, y: 4, color: "var(--color-primary)", label: "|v|=5" },
+  ]}
+  caption="A (3,4) vector: legs 3 and 4, hypotenuse 5. Length is always the hypotenuse."
+/>
+
+```odin
+len := rl.Vector2Length(v)         // sqrt(x*x + y*y)
+```
+
+Length is what a speed cap, a "within range of the turret" check, or a knockback
+distance all boil down to.
+
+## 5. Normalize — "direction only, please"
+
+A **unit vector** has length 1. To turn any vector into its unit vector you
+divide by its own length — this is *normalizing*. You keep the **direction** and
+throw away the **magnitude**.
+
+<VectorField
+  vectors={[
+    { x: 3, y: 1, color: "oklch(0.7 0.18 30)", dashed: true, label: "A |A|=3.16" },
+    { x: 0.949, y: 0.316, color: "var(--color-primary)", label: "Â" },
+  ]}
+  caption="The small solid arrow Â has the same direction as A but length 1 — the unit vector."
+/>
+
+This is the trick that fixes that "chase the player" code from above. You
+normalize the toward-player direction so the enemy moves at a *fixed speed*
+rather than teleporting when far away:
+
+```odin
+to_player  := rl.Vector2Subtract(player.pos, enemy.pos)
+dir        := rl.Vector2Normalize(to_player)   // length 1, points at player
+enemy.pos  = rl.Vector2Add(enemy.pos, rl.Vector2Scale(dir, speed))
+```
+
+> **Watch out:** `Vector2Normalize` of a zero vector divides by zero. Guard the
+> length first if there's any chance `to_player` is `(0,0)`.
+
+## 6. Distance — "how far apart are two points?"
+
+The distance between two points `A` and `B` is just `|B − A|` — subtract, then
+take the length. raylib-odin bundles both steps into one helper:
+
+```odin
+d := rl.Vector2Distance(enemy.pos, player.pos)
+if d < aggro_range {
+    // enemy has spotted the player
+}
+```
+
+<VectorField
+  vectors={[
+    { x: 4, y: 2, color: "oklch(0.7 0.18 30)", label: "enemy" },
+    { x: -1, y: 3, color: "oklch(0.65 0.16 220)", label: "player" },
+    { x: -5, y: 1, fromX: 4, fromY: 2, color: "var(--color-primary)", dashed: true, label: "distance" },
+  ]}
+  caption="Distance is the dashed arrow between the two points — it has no 'from origin' meaning, it's point-to-point."
+/>
+
+---
+
+## Your win: drive the playground
+
+Drag the **A** and **B** dots, switch operations, and watch the result redraw
+with the numbers. Convince yourself of three things before moving on:
+
+1. On **Add**, the dashed `A+B` always lands at the tip of the `B` arrow drawn
+   from the tip of `A`.
+2. On **Subtract**, `B−A` always points from `A`'s tip to `B`'s tip — flip `A`
+   and `B` and watch it reverse.
+3. On **Normalize**, the result always sits exactly **on the unit circle**
+   (dashed), no matter where you drag `A`.
+
+<VectorOpsPlayground size={340} units={5} />
+
+The whole lesson glossary is condensed into these six raylib-odin calls:
+
+```odin
+rl.Vector2Add(a, b)
+rl.Vector2Subtract(a, b)
+rl.Vector2Scale(v, k)
+rl.Vector2Length(v)
+rl.Vector2Normalize(v)
+rl.Vector2Distance(a, b)
+```
+
+<Quiz
+  question="You want an enemy to slowly drift toward a waypoint. Which pair of operations gives a fixed-speed direction?"
+  options={["Add then Length", "Subtract then Normalize", "Normalize then Length", "Scale then Distance"]}
+  answer={1}
+  explain="Subtract waypoint−enemy to get the toward vector, then Normalize it to length 1 so you can scale to a fixed speed. Raw Add/Len wouldn't give a direction."
+/>
+
+## Sources
+
+- Primary: [Freya Holmer — _Math for Game Devs_, "Vector Add/Subtract/Scale"](https://www.youtube.com/playlist?list=PLImQqTpkuLuaI3lvMR6eg3xQm5MBl5zQb) — the tip-to-tail visuals here mirror her whiteboard work.
+- API: [raylib `Vector2*` helpers](https://www.raylib.com/) and the [raylib-odin bindings](https://github.com/raylib-o/raylib-odin) for exact `rl.Vector2*` names (`Vector2Add`, `Vector2Subtract`, `Vector2Scale`, `Vector2Length`, `Vector2Normalize`, `Vector2Distance`).
+
+## Next
+
+Lesson 3 steps away from vectors for a moment to refresh **trigonometry** —
+`sin`/`cos`, radians vs degrees, and `atan2`. You'll need it the moment you want
+to rotate a sprite to face the mouse or lay bullets out in a spread. Tell your
+agent when you're ready.
+
+Stuck on a diagram? Drag things in the playground until it clicks, or ask your
+agent — it can re-explain tip-to-tail, show another raylib-odin snippet, or
+slow down if `normalize` still feels slippery.

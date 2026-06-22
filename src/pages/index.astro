@@ -39,12 +39,14 @@ const topics = (await getCollection('topics'))
           <ul class="flex flex-col gap-3">
             {topics.map((t) => (
               <li class="card bg-base-200/50 border border-base-content/10">
-                <div class="card-body">
-                  <a href={`/topics/${t.data.slug}`} class="link link-hover text-xl font-medium">
-                    {t.data.title}
-                  </a>
-                  <p class="text-base-content/70">{t.data.description}</p>
-                </div>
+                <a href={`/topics/${t.data.slug}`} class="link link-hover ">
+                  <div class="card-body">
+                    <h4 class="text-xl font-medium">
+                      {t.data.title}
+                    </h4>
+                    <p class="text-base-content/70">{t.data.description}</p>
+                  </div>
+                </a>
               </li>
             ))}
           </ul>
