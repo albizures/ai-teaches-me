@@ -9,25 +9,200 @@ const topics = (await getCollection('topics'))
 
 <Layout>
   <main class="max-w-3xl mx-auto px-6 py-12">
-    <h1 class="text-3xl font-semibold mb-2">Topics</h1>
-    <p class="text-base-content/70 mb-8">A self-directed course log. Each topic lives in its own workspace.</p>
-    {
-      topics.length === 0 ? (
-        <p class="italic text-base-content/50">No topics yet.</p>
-      ) : (
-        <ul class="flex flex-col gap-3">
-          {topics.map((t) => (
-            <li class="card bg-base-200/50 border border-base-content/10">
-              <div class="card-body">
-                <a href={`/topics/${t.id.split('/')[0]}`} class="link link-hover text-xl font-medium">
-                  {t.data.title}
-                </a>
-                <p class="text-base-content/70">{t.data.description}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )
-    }
+    <section class="mb-12">
+      <h1 class="text-4xl font-bold mb-3">ai-teach</h1>
+      <p class="text-lg text-base-content/80 mb-4">
+        A self-directed learning workspace, taught by an AI agent, rendered as a
+        beautiful static site.
+      </p>
+      <p class="text-base-content/70">
+        Tell your agent what you want to <em>be able to do</em> — read and write
+        raylib vector math for your 2D shooter, hold a handstand, understand
+        pharmacokinetics — and it builds you an entire course: a mission, a
+        curated reading list, interactive lessons, reference cheat-sheets, and
+        a log of what you've actually mastered. Everything is plain
+        Markdown/MDX in this repo and renders to a clean, browsable site you can
+        revisit for years.
+      </p>
+    </section>
+
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold mb-2">Your topics</h2>
+      <p class="text-base-content/70 mb-6">
+        Each topic is a self-contained workspace with its own mission, resources,
+        lessons, and learning records. Pick one to keep going.
+      </p>
+      {
+        topics.length === 0 ? (
+          <p class="italic text-base-content/50">No topics yet.</p>
+        ) : (
+          <ul class="flex flex-col gap-3">
+            {topics.map((t) => (
+              <li class="card bg-base-200/50 border border-base-content/10">
+                <div class="card-body">
+                  <a href={`/topics/${t.id.split('/')[0]}`} class="link link-hover text-xl font-medium">
+                    {t.data.title}
+                  </a>
+                  <p class="text-base-content/70">{t.data.description}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </section>
+
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold mb-4">Why this exists</h2>
+      <p class="text-base-content/70 mb-3">
+        Most "learn X with AI" interactions die in one session: the agent
+        answers a question, you forget the answer, and nothing compounds.
+        ai-teach flips that. Every teaching decision the agent makes — what to
+        teach next, which sources to trust, how hard to push — is grounded in a
+        small set of files that persist across sessions and that you can edit.
+      </p>
+      <p class="text-base-content/70 mb-4">
+        The agent has three jobs, mirroring a real educator:
+      </p>
+      <ul class="flex flex-col gap-3 mb-3">
+        <li class="card bg-base-200/50 border border-base-content/10">
+          <div class="card-body">
+            <h3 class="font-semibold">Knowledge</h3>
+            <p class="text-base-content/70">
+              Gathered from high-quality, high-trust sources (books, primary
+              docs, expert communities) and recorded in each topic's
+              <code class="kbd kbd-sm">RESOURCES.md</code>. The agent never
+              trusts its parametric memory when a resource can be cited.
+            </p>
+          </div>
+        </li>
+        <li class="card bg-base-200/50 border border-base-content/10">
+          <div class="card-body">
+            <h3 class="font-semibold">Skills</h3>
+            <p class="text-base-content/70">
+              Acquired through short, interactive lessons with tight feedback
+              loops — in-browser quizzes and guided real-world tasks. Effortful
+              retrieval, not passive re-reading, is what builds retention.
+            </p>
+          </div>
+        </li>
+        <li class="card bg-base-200/50 border border-base-content/10">
+          <div class="card-body">
+            <h3 class="font-semibold">Wisdom</h3>
+            <p class="text-base-content/70">
+              The agent can only take you so far. When a question needs
+              real-world feedback, it delegates you to a high-reputation
+              community listed in <code class="kbd kbd-sm">RESOURCES.md</code>.
+            </p>
+          </div>
+        </li>
+      </ul>
+      <p class="text-base-content/70">
+        Every lesson ties back to a <strong>mission</strong> — the concrete,
+        real-world outcome you are chasing. If your mission is vague, the agent
+        interviews you before writing anything, because a bad mission steers
+        every future session wrong.
+      </p>
+    </section>
+
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold mb-4">Learning philosophy baked in</h2>
+      <ul class="flex flex-col gap-3">
+        <li class="card bg-base-200/50 border border-base-content/10">
+          <div class="card-body">
+            <h3 class="font-semibold">Fluency vs. storage strength</h3>
+            <p class="text-base-content/70">
+              In-the-moment recall is an illusory sense of mastery; long-term
+              retention is the real goal. Lessons use desirable difficulty:
+              retrieval practice, spacing, and interleaving.
+            </p>
+          </div>
+        </li>
+        <li class="card bg-base-200/50 border border-base-content/10">
+          <div class="card-body">
+            <h3 class="font-semibold">Zone of proximal development</h3>
+            <p class="text-base-content/70">
+              Each lesson is sized to challenge you "just enough." The agent
+              reads your prior learning records to find your edge rather than
+              re-teaching what you know.
+            </p>
+          </div>
+        </li>
+        <li class="card bg-base-200/50 border border-base-content/10">
+          <div class="card-body">
+            <h3 class="font-semibold">Working memory is tiny</h3>
+            <p class="text-base-content/70">
+              Lessons are short and completable quickly, each delivering one
+              tangible win that builds on the last.
+            </p>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold mb-4">How to use it</h2>
+      <ol class="steps steps-vertical">
+        <li class="step step-accent text-left">
+          <div>
+            <strong>Stress-test the idea first.</strong> Run the
+            <code class="kbd kbd-sm">grill-my-topic</code> skill. It interviews you
+            one question at a time until your vague idea becomes a mission scoped
+            to about ten lessons.
+          </div>
+        </li>
+        <li class="step step-accent text-left">
+          <div>
+          <strong>Build the topic.</strong> The
+          <code class="kbd kbd-sm">teach</code> skill turns that mission into a
+          workspace: <code class="kbd kbd-sm">MISSION.md</code>,
+          <code class="kbd kbd-sm">RESOURCES.md</code>, and your first lessons.
+          </div>
+        </li>
+        <li class="step step-accent text-left">
+          <div>
+          <strong>Keep going.</strong> In a later session say "teach me the next
+          lesson for &lt;topic&gt;" and the agent picks up where you left off,
+          reading your records to find your edge.
+          </div>
+        </li>
+      </ol>
+      <p class="text-base-content/70 mt-4">
+        The project ships with the
+        <a href="/topics/2d-game-math" class="link link-hover">2D Game Math</a>
+        example topic (vector math for an Odin + raylib top-down shooter) so you
+        can see how a finished topic is structured.
+      </p>
+    </section>
+
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold mb-3">Inspiration</h2>
+      <p class="text-base-content/70">
+        This project owes a huge debt to
+        <a href="https://github.com/mattpocock/skills" class="link link-hover">
+          Matt Pocock's <code class="kbd kbd-sm">skills</code> repo
+        </a>
+        ("Skills for Real Engineers"). Our
+        <code class="kbd kbd-sm">grill-my-topic</code> is his
+        <a href="https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me" class="link link-hover">grill-me</a>
+        /
+        <a href="https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs" class="link link-hover">grill-with-docs</a>
+        retuned for course design; our
+        <code class="kbd kbd-sm">teach</code> is his
+        <a href="https://github.com/mattpocock/skills/tree/main/skills/productivity/teach" class="link link-hover">teach</a>,
+        grounded harder in files. Go read them.
+      </p>
+    </section>
+
+    <section class="mb-4">
+      <h2 class="text-2xl font-semibold mb-3">Want to learn more?</h2>
+      <ul class="list-disc list-inside text-base-content/70 flex flex-col gap-1">
+        <li>Read the <a href="https://github.com/earendil-works/pi-coding-agent" class="link link-hover">teach skill</a> — the full operating manual.</li>
+        <li>Browse the example topic at
+          <a href="/topics/2d-game-math" class="link link-hover">src/topics/2d-game-math/</a>.
+        </li>
+        <li>Astro docs: <a href="https://docs.astro.build" class="link link-hover">docs.astro.build</a></li>
+      </ul>
+    </section>
   </main>
 </Layout>
