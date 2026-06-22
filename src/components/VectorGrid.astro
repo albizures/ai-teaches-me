@@ -1,17 +1,28 @@
 ---
-type Vec = {
-  x: number
-  y: number
-  fromX?: number
-  fromY?: number
+type Common = {
   color?: string
   label?: string
-  dashed?: boolean
   width?: number
 }
 
+type Point = {
+  x: number
+  y: number
+} & Common
+
+type Vector = {
+  // End point (absolute grid coordinates).
+  x: number
+  y: number
+  // Start point (absolute grid coordinates); defaults to the origin (0, 0).
+  fromX?: number
+  fromY?: number
+  dashed?: boolean
+} & Common
+
 type Props = {
-  vectors: Vec[]
+  points?: Point[]
+  vectors?: Vector[]
   size?: number
   units?: number
   origin?: 'center' | 'topleft'
@@ -19,7 +30,7 @@ type Props = {
   caption?: string
 }
 
-const { vectors, size = 320, units = 5, origin = 'center', showGrid = true, caption } = Astro.props
+const { points = [], vectors = [], size = 320, units = 5, origin = 'center', showGrid = true, caption } = Astro.props
 
 const px = size
 const cx = origin === 'center' ? px / 2 : 24
@@ -106,88 +117,92 @@ const range
   {caption && <figcaption class="text-sm text-base-content/60 mt-2 text-center max-w-md">{caption}</figcaption>}
 
   {/* per-instance props, read by connectedCallback */}
-  <script type="application/json" class="vg-props" set:html={JSON.stringify(vectors)} />
+  <script type="application/json" class="vg-props" set:html={JSON.stringify({ points, vectors })} />
 </figure>
 
 <script>
-  import type { Stage } from '../lib/svg-stage'
-  import type { Vec } from '../lib/vec'
-  import { clear, makeStage } from '../lib/svg-stage'
-  import { add, vec } from '../lib/vec'
+import type { Stage } from '../lib/svg-stage'
+import { clear, makeStage } from '../lib/svg-stage'
+import { vec } from '../lib/vec'
 
-  type VecProp = Vec & {
-    fromX?: number
-    fromY?: number
-    color?: string
-    label?: string
-    dashed?: boolean
-    width?: number
-  }
+type Common = {
+  color?: string
+  label?: string
+  width?: number
+}
+type Point = { x: number, y: number } & Common
+type Vector = {
+  x: number
+  y: number
+  fromX?: number
+  fromY?: number
+  dashed?: boolean
+} & Common
 
-  const PRIMARY = 'var(--color-primary, currentColor)'
+const PRIMARY = 'var(--color-primary, currentColor)'
 
-  let instanceSeq = 0
-  class VectorGrid extends HTMLElement {
-    #ready = false
+let instanceSeq = 0
+class VectorGrid extends HTMLElement {
+  #ready = false
 
-    connectedCallback(): void {
-      if (this.#ready) {
-        return
-      }
-      this.#ready = true
+  connectedCallback(): void {
+    if (this.#ready) {
+      return
+    }
+    this.#ready = true
 
-      const svg = this.querySelector<SVGSVGElement>('svg')
-      const markers = this.querySelectorAll<SVGMarkerElement>('marker.vg-arrowhead')
-      const layer = this.querySelector<SVGGElement>('.vg-vectors')
-      const propsEl = this.querySelector<HTMLScriptElement>('script.vg-props')
-      if (!svg || !layer || !propsEl || markers.length === 0) {
-        return
-      }
+    const svg = this.querySelector<SVGSVGElement>('svg')
+    const markers = this.querySelectorAll<SVGMarkerElement>('marker.vg-arrowhead')
+    const layer = this.querySelector<SVGGElement>('.vg-vectors')
+    const propsEl = this.querySelector<HTMLScriptElement>('script.vg-props')
+    if (!svg || !layer || !propsEl || markers.length === 0) {
+      return
+    }
 
-      const px = Number(this.dataset.size)
-      const units = Number(this.dataset.units)
-      const origin = (this.dataset.origin ?? 'center') as 'center' | 'topleft'
-      const cx = origin === 'center' ? px / 2 : 24
-      const cy = origin === 'center' ? px / 2 : 24
-      const pxPerUnit = (px / 2 - 16) / units
+    const px = Number(this.dataset.size)
+    const units = Number(this.dataset.units)
+    const origin = (this.dataset.origin ?? 'center') as 'center' | 'topleft'
+    const cx = origin === 'center' ? px / 2 : 24
+    const cy = origin === 'center' ? px / 2 : 24
+    const pxPerUnit = (px / 2 - 16) / units
 
-      const markerId = `vg-ah-${instanceSeq++}`
-      markers.forEach((m) => {
-        m.id = markerId
+    const markerId = `vg-ah-${instanceSeq++}`
+    markers.forEach((m) => {
+      m.id = markerId
+    })
+    const stage: Stage = makeStage(cx, cy, pxPerUnit, markerId)
+
+    let parsedPoints: Point[] = []
+    let parsedVectors: Vector[] = []
+    try {
+      const data = JSON.parse(propsEl.textContent ?? '{}') as { points?: Point[], vectors?: Vector[] }
+      parsedPoints = data.points ?? []
+      parsedVectors = data.vectors ?? []
+    }
+    catch {
+      parsedPoints = []
+      parsedVectors = []
+    }
+
+    clear(layer)
+    for (const p of parsedPoints) {
+      // `width` is read as the dot radius in px so authors can size points.
+      stage.point(layer, vec(p.x, p.y), p.color ?? PRIMARY, {
+        label: p.label,
+        radius: p.width ?? 3,
       })
-      const stage: Stage = makeStage(cx, cy, pxPerUnit, markerId)
-
-      let vectors: VecProp[] = []
-      try {
-        vectors = JSON.parse(propsEl.textContent ?? '[]') as VecProp[]
-      }
-      catch {
-        vectors = []
-      }
-
-      clear(layer)
-      for (const v of vectors) {
-        const col = v.color ?? PRIMARY
-        if (v.fromX === undefined || v.fromY === undefined) {
-          // `dashed` is meaningless for a dot and is ignored; `width`, if any,
-          // is read as the dot radius in px so authors can size points.
-          stage.point(layer, vec(v.x, v.y), col, {
-            label: v.label,
-            radius: v.width ?? 3,
-          })
-        }
-        else {
-          const from = vec(v.fromX, v.fromY)
-          const to = add(from, vec(v.x, v.y))
-          stage.arrow(layer, from, to, col, {
-            width: v.width ?? 2,
-            dashed: v.dashed,
-            label: v.label,
-          })
-        }
-      }
+    }
+    for (const v of parsedVectors) {
+      const from = vec(v.fromX ?? 0, v.fromY ?? 0)
+      const to = vec(v.x, v.y)
+      stage.arrow(layer, from, to, v.color ?? PRIMARY, {
+        width: v.width ?? 2,
+        dashed: v.dashed,
+        label: v.label,
+      })
     }
   }
+}
 
-  customElements.define('vector-grid', VectorGrid, { extends: 'figure' })
+customElements.define('vector-grid', VectorGrid, { extends: 'figure' })
 </script>

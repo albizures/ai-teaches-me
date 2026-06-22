@@ -9,7 +9,7 @@
 // convention in the consuming components, not by `readonly` here. Always
 // assign a new `Vec` rather than mutate one in place.
 
-export interface Vec { x: number, y: number }
+export type Vec = { x: number, y: number }
 
 export const vec = (x: number, y: number): Vec => ({ x, y })
 

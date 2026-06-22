@@ -24,9 +24,9 @@ result `A + B` runs from the tail of `A` straight to the tip of `B`.
 
 <VectorGrid
   vectors={[
-    { x: 3, y: 1, fromX: 0, fromY: 0, color: "oklch(0.7 0.18 30)", label: "A" },
-    { x: 1, y: 2, fromX: 3, fromY: 1, color: "oklch(0.65 0.16 220)", label: "B" },
-    { x: 4, y: 3, fromX: 0, fromY: 0, color: "var(--color-primary)", dashed: true, label: "A+B" },
+    { x: 3, y: 1, color: "oklch(0.7 0.18 30)", label: "A" },
+    { x: 4, y: 3, fromX: 3, fromY: 1, color: "oklch(0.65 0.16 220)", label: "B" },
+    { x: 4, y: 3, color: "var(--color-primary)", dashed: true, label: "A+B" },
   ]}
   caption="A (warm) and B (cool) laid tip-to-tail. The dashed result A+B closes the triangle from the origin."
 />
@@ -48,9 +48,9 @@ vectors from the origin; the subtraction is the arrow that goes from the tip of
 
 <VectorGrid
   vectors={[
-    { x: 3, y: 1, fromX: 0, fromY: 0, color: "oklch(0.7 0.18 30)", label: "A" },
-    { x: 1, y: 3,fromX: 0, fromY: 0, color: "oklch(0.65 0.16 220)", label: "B" },
-    { x: -2, y: 2, fromX: 3, fromY: 1, color: "var(--color-primary)", dashed: true, label: "B−A" },
+    { x: 3, y: 1, color: "oklch(0.7 0.18 30)", label: "A" },
+    { x: 1, y: 3, color: "oklch(0.65 0.16 220)", label: "B" },
+    { x: 1, y: 3, fromX: 3, fromY: 1, color: "var(--color-primary)", dashed: true, label: "B−A" },
   ]}
   caption="B − A starts at the tip of A and ends at the tip of B. This is how you get a 'toward the player' vector."
 />
@@ -75,8 +75,8 @@ direction (when `k > 0`). `k > 1` stretches, `0 < k < 1` shrinks, and a
 
 <VectorGrid
   vectors={[
-    { x: 4, y: 2,fromX: 0, fromY: 0, color: "var(--color-primary)", label: "A×2" },
-    { x: 2, y: 1, fromX: 0, fromY: 0, color: "oklch(0.7 0.18 30)", label: "A" },
+    { x: 4, y: 2, color: "var(--color-primary)", label: "A×2" },
+    { x: 2, y: 1, color: "oklch(0.7 0.18 30)", label: "A" },
   ]}
   caption="Scaling by 2 doubles both x and y — same direction, twice as long."
 />
@@ -98,9 +98,9 @@ right triangle with legs `x` and `y`.
 
 <VectorGrid
   vectors={[
-    { x: 3, y: 0, fromX: 0, fromY: 0, color: "oklch(0.7 0.18 30)", label: "x" },
-    { x: 0, y: 4, fromX: 3, fromY: 0, color: "oklch(0.65 0.16 220)", label: "y" },
-    { x: 3, y: 4, fromX: 0, fromY: 0, color: "var(--color-primary)", label: "|v|=5" },
+    { x: 3, y: 0, color: "oklch(0.7 0.18 30)", label: "x" },
+    { x: 3, y: 4, fromX: 3, fromY: 0, color: "oklch(0.65 0.16 220)", label: "y" },
+    { x: 3, y: 4, color: "var(--color-primary)", label: "|v|=5" },
   ]}
   caption="A (3,4) vector: legs 3 and 4, hypotenuse 5. Length is always the hypotenuse."
 />
@@ -120,8 +120,8 @@ throw away the **magnitude**.
 
 <VectorGrid
   vectors={[
-    { x: 3, y: 1, fromX: 0, fromY: 0, color: "oklch(0.7 0.18 30)", dashed: true, label: "A |A|=3.16" },
-    { x: 0.949, y: 0.316, fromX: 0, fromY: 0, color: "var(--color-primary)", label: "Â" },
+    { x: 3, y: 1, color: "oklch(0.7 0.18 30)", dashed: true, label: "A |A|=3.16" },
+    { x: 0.949, y: 0.316, color: "var(--color-primary)", label: "Â" },
   ]}
   caption="The small solid arrow Â has the same direction as A but length 1 — the unit vector."
 />
@@ -153,9 +153,9 @@ if d < aggro_range {
 
 <VectorGrid
   vectors={[
-    { x: 4, y: 2, fromX: 0, fromY: 0, color: "oklch(0.7 0.18 30)", label: "enemy" },
-    { x: -1, y: 3,fromX: 0, fromY: 0,  color: "oklch(0.65 0.16 220)", label: "player" },
-    { x: -5, y: 1, fromX: 4, fromY: 2, color: "var(--color-primary)", dashed: true, label: "distance" },
+    { x: 4, y: 2, color: "oklch(0.7 0.18 30)", label: "enemy" },
+    { x: -1, y: 3, color: "oklch(0.65 0.16 220)", label: "player" },
+    { x: -1, y: 3, fromX: 4, fromY: 2, color: "var(--color-primary)", dashed: true, label: "distance" },
   ]}
   caption="Distance is the dashed arrow between the two points — it has no 'from origin' meaning, it's point-to-point."
 />

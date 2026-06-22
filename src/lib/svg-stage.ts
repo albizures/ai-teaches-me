@@ -35,20 +35,20 @@ export function clear(layer: Node & ParentNode): void {
   while (layer.firstChild) layer.removeChild(layer.firstChild)
 }
 
-export interface ArrowOpts {
+export type ArrowOpts = {
   width?: number
   dashed?: boolean | undefined
   label?: string | undefined
 }
 
-export interface PointOpts {
+export type PointOpts = {
   /** Stroke/fill radius in pixels. Defaults to 5. */
   radius?: number | undefined
   /** Optional text label drawn next to the dot. */
   label?: string | undefined
 }
 
-export interface Stage {
+export type Stage = {
   /** Map a grid-unit Vec to screen-pixel coordinates. */
   pt: (v: Vec) => Vec
   arrow: (
@@ -175,7 +175,7 @@ export function makeStage(
   }
 }
 
-interface LabelProps {
+type LabelProps = {
   label?: string | undefined
   x: number
   y: number

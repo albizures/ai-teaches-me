@@ -258,7 +258,7 @@ function Readout(readout: HTMLElement, get: VecState) {
 }
 
 // --- bundle of (possibly) shared state accessors -------------------------
-interface VecState {
+type VecState = {
   A: VanState<Vec>
   B: VanState<Vec>
   op: VanState<Op>
