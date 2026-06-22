@@ -31,4 +31,5 @@
   Broad game-dev community. Use for: general 2D math and movement-feel critique.
 
 ## Gaps
+
 - No single canonical "2D top-down shooter math in raylib-odin" tutorial exists; we build lessons from the above sources plus raylib examples rather than following one text.

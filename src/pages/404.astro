@@ -1,12 +1,8 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import Layout from '../layouts/Layout.astro'
 
-const headings = [
-  'Lost in the curriculum',
-  "This lesson wasn't assigned",
-  'Page not on the syllabus',
-];
-const heading = headings[Math.floor(Math.random() * headings.length)];
+const headings = ['Lost in the curriculum', 'This lesson wasn\'t assigned', 'Page not on the syllabus']
+const heading = headings[Math.floor(Math.random() * headings.length)]
 ---
 
 <Layout>
@@ -14,8 +10,8 @@ const heading = headings[Math.floor(Math.random() * headings.length)];
     <p class="text-8xl font-bold mb-6 text-base-content/30">404</p>
     <h1 class="text-3xl font-semibold mb-3">{heading}</h1>
     <p class="text-base-content/70 mb-8">
-      The page you're looking for doesn't exist — or hasn't been written yet.
-      Maybe it's the next lesson your agent hasn't taught you.
+      The page you're looking for doesn't exist — or hasn't been written yet. Maybe it's the next lesson your agent
+      hasn't taught you.
     </p>
     <div class="flex justify-center gap-3">
       <a href="/" class="btn btn-primary">Back to home</a>

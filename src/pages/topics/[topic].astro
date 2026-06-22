@@ -1,24 +1,22 @@
 ---
-import { getCollection, render } from 'astro:content';
-import Layout from '../../layouts/Layout.astro';
+import { getCollection, render } from 'astro:content'
+import Layout from '../../layouts/Layout.astro'
 
 export async function getStaticPaths() {
-  const topics = await getCollection('topics');
-  return topics.map((t) => ({
+  const topics = await getCollection('topics')
+  return topics.map(t => ({
     params: { topic: t.data.slug },
-  }));
+  }))
 }
 
-const { topic } = Astro.params;
-const entry = (await getCollection('topics')).find(
-  (t) => t.data.slug === topic
-);
+const { topic } = Astro.params
+const entry = (await getCollection('topics')).find(t => t.data.slug === topic)
 
 if (!entry) {
-  return Astro.redirect('/404');
+  return Astro.redirect('/404')
 }
 
-const { Content } = await render(entry);
+const { Content } = await render(entry)
 ---
 
 <Layout>

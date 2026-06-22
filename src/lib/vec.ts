@@ -9,25 +9,27 @@
 // convention in the consuming components, not by `readonly` here. Always
 // assign a new `Vec` rather than mutate one in place.
 
-export type Vec = { x: number; y: number };
+export interface Vec { x: number, y: number }
 
-export const vec = (x: number, y: number): Vec => ({ x, y });
+export const vec = (x: number, y: number): Vec => ({ x, y })
 
 // Vector ops. Note these mirror the playground's operation names so the
 // visual arrows and the numeric read-out share one source of truth.
-export const add = (a: Vec, b: Vec): Vec => ({ x: a.x + b.x, y: a.y + b.y });
-export const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y });
-export const scale = (a: Vec, k: number): Vec => ({ x: a.x * k, y: a.y * k });
-export const length = (v: Vec): number => Math.hypot(v.x, v.y);
-export const normalize = (a: Vec): Vec => {
-  const l = length(a);
-  return l > 0 ? { x: a.x / l, y: a.y / l } : { x: 0, y: 0 };
-};
-export const distance = (a: Vec, b: Vec): number => length(sub(b, a));
+export const add = (a: Vec, b: Vec): Vec => ({ x: a.x + b.x, y: a.y + b.y })
+export const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y })
+export const scale = (a: Vec, k: number): Vec => ({ x: a.x * k, y: a.y * k })
+export const length = (v: Vec): number => Math.hypot(v.x, v.y)
+export function normalize(a: Vec): Vec {
+  const l = length(a)
+  return l > 0 ? { x: a.x / l, y: a.y / l } : { x: 0, y: 0 }
+}
+export const distance = (a: Vec, b: Vec): number => length(sub(b, a))
 
 // Grid ↔ pixel conversion utilities (no DOM).
-export const clamp = (v: number, lo: number, hi: number): number =>
-  Math.max(lo, Math.min(hi, v));
+export function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v))
+}
 
-export const fmt = (n: number): string =>
-  (Math.round(n * 100) / 100).toString();
+export function fmt(n: number): string {
+  return (Math.round(n * 100) / 100).toString()
+}

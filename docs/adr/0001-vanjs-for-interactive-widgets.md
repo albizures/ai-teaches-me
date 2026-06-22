@@ -56,7 +56,7 @@ SVG mapping so future widgets and `VectorGrid.astro` can share them.
   cross-navigation listener leak that already existed pre-refactor — kept
   deliberately to minimize behavioral change.
 - **Mount mechanism:** the random per-instance id + `data-vop` + `initAll()`
-  scoping used here is **not** the house style for *new* widgets.
+  scoping used here is **not** the house style for _new_ widgets.
   ADR-0002 sets the forward rule — mount interactive widgets as custom
   elements so per-instance logic is scoped by the DOM boundary instead of
   by author-minted unique ids. This component is grandfathered by ADR-0002

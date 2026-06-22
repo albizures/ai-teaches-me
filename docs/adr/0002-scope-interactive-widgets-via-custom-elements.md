@@ -12,12 +12,12 @@ style/control encapsulation is a plus, not a precondition.
 ## Considered Options
 
 - **Random per-instance id + `data-*` selector** (the current `VectorOpsPlayground`
-  pattern; rejected for *new* widgets) — works, and is the conventional Astro
+  pattern; rejected for _new_ widgets) — works, and is the conventional Astro
   answer, but forces the author to suffix every queryable element
   (`#{id}-svg`, `#{id}-ops`, `#{id}-k`, …) and to run a module-level
   `initAll()` + `astro:page-load` probe over `document.querySelectorAll`. It
-  scopes by *convention* against ids the author must invent and keep unique;
-  the custom element scopes by *the DOM boundary itself*. We keep this only
+  scopes by _convention_ against ids the author must invent and keep unique;
+  the custom element scopes by _the DOM boundary itself_. We keep this only
   for the pre-existing `VectorOpsPlayground` (see Consequences).
 - **Shadow DOM on every custom element** (rejected as a hard rule) — strongest
   encapsulation (no surrounding-prose CSS in, no widget CSS out), but
@@ -38,7 +38,7 @@ style/control encapsulation is a plus, not a precondition.
 - **Forward rule:** new interactive widgets are custom elements. The
   vanjs-core / "`.astro` shell + van-state controller + presentational
   leaves + `src/lib/` substrate" shape from ADR-0001 still holds; the custom
-  element is the *mount envelope* for that shape, not a replacement for it.
+  element is the _mount envelope_ for that shape, not a replacement for it.
 - **`VectorOpsPlayground` is grandfathered, with dated migration debt.** It
   keeps its random-id + `data-vop` + `initAll()` + `astro:page-load` pattern
   today to minimize behavioral change (same posture ADR-0001 takes toward

@@ -2,7 +2,7 @@
 
 **A self-directed learning workspace, taught by an AI agent, rendered as a beautiful static site.**
 
-`ai-teach` turns your AI agent into a patient, stateful tutor. You tell it what you want to *be able to do* — "read and write raylib `Vector2` math for my 2D shooter", "hold a handstand", "understand pharmacokinetics" — and it builds you an entire course from scratch: a mission, a curated reading list, interactive lessons, reference cheat-sheets, and a log of what you've actually mastered. Everything is plain Markdown/MDX in this repo and renders to a clean, browsable Astro site you can read offline and revisit for years.
+`ai-teach` turns your AI agent into a patient, stateful tutor. You tell it what you want to _be able to do_ — "read and write raylib `Vector2` math for my 2D shooter", "hold a handstand", "understand pharmacokinetics" — and it builds you an entire course from scratch: a mission, a curated reading list, interactive lessons, reference cheat-sheets, and a log of what you've actually mastered. Everything is plain Markdown/MDX in this repo and renders to a clean, browsable Astro site you can read offline and revisit for years.
 
 It is _not_ a chat tutor that forgets you tomorrow. The teaching is grounded in files: a mission that stays in view, high-trust resources that back every claim, lesson artifacts designed like Tufte pages, and learning records that act like ADRs for your own understanding.
 
@@ -93,7 +93,7 @@ The repo ships with two skills that work together. The honest order is: **grill 
 
 ### 1. Stress-test the idea first — `/grill-my-topic`
 
-Before committing to a topic, run the `grill-my-topic` skill. It interviews you relentlessly about every aspect of the topic — *why* you want it, what "done" looks like, what's in and out of scope — walking down each branch of the design tree one question at a time. For each question it offers its *recommended* answer, then waits for your verdict.
+Before committing to a topic, run the `grill-my-topic` skill. It interviews you relentlessly about every aspect of the topic — _why_ you want it, what "done" looks like, what's in and out of scope — walking down each branch of the design tree one question at a time. For each question it offers its _recommended_ answer, then waits for your verdict.
 
 Use it to:
 
@@ -109,7 +109,7 @@ Once you and the griller agree, hand off to the `teach` skill to actually create
 
 ### Adding more lessons later
 
-You don't have to build the whole course up front. In a later session just say *"teach me the next lesson for/<topic>"* — or name a specific thing — and the agent reads `MISSION.md`, the existing learning records, and `RESOURCES.md` to pick the right next lesson and increments the per-topic numbering. `.active` keeps your place across topics so you don't have to reintroduce yourself every session.
+You don't have to build the whole course up front. In a later session just say _"teach me the next lesson for/<topic>"_ — or name a specific thing — and the agent reads `MISSION.md`, the existing learning records, and `RESOURCES.md` to pick the right next lesson and increments the per-topic numbering. `.active` keeps your place across topics so you don't have to reintroduce yourself every session.
 
 ### Switching topics
 
@@ -117,21 +117,21 @@ Many topics can coexist under `src/topics/`. Name a topic in your request to swi
 
 ### Evolving a mission
 
-Missions change as you learn more. When your goal shifts, the agent confirms with you, updates `MISSION.md`, and writes a learning record capturing the change — so the history of *why* you're learning is preserved alongside what you've learned.
+Missions change as you learn more. When your goal shifts, the agent confirms with you, updates `MISSION.md`, and writes a learning record capturing the change — so the history of _why_ you're learning is preserved alongside what you've learned.
 
 ---
 
 ## Notes & shared preferences
 
-- `NOTES.md` at the workspace root captures *cross-topic* preferences (teaching style, learning cadence, accessibility needs).
-- `src/topics/<slug>/NOTES.md` captures *topic-specific* working notes.
+- `NOTES.md` at the workspace root captures _cross-topic_ preferences (teaching style, learning cadence, accessibility needs).
+- `src/topics/<slug>/NOTES.md` captures _topic-specific_ working notes.
 - Both are scratchpads the agent reads when designing lessons.
 
 ---
 
 ## Inspiration
 
-This project owes a huge debt to [Matt Pocock's `skills` repo](https://github.com/mattpocock/skills) (*"Skills for Real Engineers"*). Our `grill-my-topic` is his [`grill-me`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) / [`grill-with-docs`](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) retuned for course design; our `teach` is his [`teach`](https://github.com/mattpocock/skills/tree/main/skills/productivity/teach), grounded harder in files. Go read them.
+This project owes a huge debt to [Matt Pocock's `skills` repo](https://github.com/mattpocock/skills) (_"Skills for Real Engineers"_). Our `grill-my-topic` is his [`grill-me`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) / [`grill-with-docs`](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) retuned for course design; our `teach` is his [`teach`](https://github.com/mattpocock/skills/tree/main/skills/productivity/teach), grounded harder in files. Go read them.
 
 ---
 

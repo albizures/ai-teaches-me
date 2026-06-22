@@ -1,9 +1,10 @@
 # Workspace Notes (cross-topic preferences)
 
-Preferences the learner has expressed about *how* they want to be taught. Apply
+Preferences the learner has expressed about _how_ they want to be taught. Apply
 these across every topic.
 
 ## Teaching style
+
 - **Visual examples by default.** The learner learns better when concepts come
   with a picture or an interactive widget, not just prose + code. Build (or
   reuse) SVG diagrams and small interactive playgrounds for new concepts, and

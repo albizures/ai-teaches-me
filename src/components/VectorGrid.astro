@@ -1,49 +1,43 @@
 ---
-
 type Vec = {
-  x: number;
-  y: number;
-  fromX?: number;
-  fromY?: number;
-  color?: string;
-  label?: string;
-  dashed?: boolean;
-  width?: number;
-};
+  x: number
+  y: number
+  fromX?: number
+  fromY?: number
+  color?: string
+  label?: string
+  dashed?: boolean
+  width?: number
+}
 
 type Props = {
-  vectors: Vec[];
-  size?: number;
-  units?: number;
-  origin?: "center" | "topleft";
-  showGrid?: boolean;
-  caption?: string;
-};
+  vectors: Vec[]
+  size?: number
+  units?: number
+  origin?: 'center' | 'topleft'
+  showGrid?: boolean
+  caption?: string
+}
 
-const {
-  vectors,
-  size = 320,
-  units = 5,
-  origin = "center",
-  showGrid = true,
-  caption,
-} = Astro.props;
+const { vectors, size = 320, units = 5, origin = 'center', showGrid = true, caption } = Astro.props
 
-const px = size;
-const cx = origin === "center" ? px / 2 : 24;
-const cy = origin === "center" ? px / 2 : 24;
-const scale = (px / 2 - 16) / units; // leave a margin
+const px = size
+const cx = origin === 'center' ? px / 2 : 24
+const cy = origin === 'center' ? px / 2 : 24
+const scale = (px / 2 - 16) / units // leave a margin
 
-const toScreen = (gx: number, gy: number) => ({
+function toScreen(gx: number, gy: number) {
+  return {
   x: cx + gx * scale,
   y: cy + gy * scale, // +y down, like a screen
-});
+}
+}
 
 // Grid lines from -units..+units (center) or 0..units (topleft).
-const range = origin === "center"
-  ? Array.from({ length: units * 2 + 1 }, (_, i) => i - units)
-  : Array.from({ length: units + 1 }, (_, i) => i);
-
+const range
+  = origin === 'center'
+    ? Array.from({ length: units * 2 + 1 }, (_, i) => i - units)
+    : Array.from({ length: units + 1 }, (_, i) => i)
 ---
 
 <figure
@@ -52,7 +46,7 @@ const range = origin === "center"
   data-size={px}
   data-units={units}
   data-origin={origin}
-  data-show-grid={showGrid ? "1" : "0"}
+  data-show-grid={showGrid ? '1' : '0'}
 >
   <svg
     viewBox={`0 0 ${px} ${px}`}
@@ -60,33 +54,41 @@ const range = origin === "center"
     style={`max-width:${px}px; aspect-ratio:1;`}
     class="rounded-box border border-base-content/15 bg-base-200/30"
     role="img"
-    aria-label={caption ?? "Vector diagram"}
+    aria-label={caption ?? 'Vector diagram'}
   >
     <defs>
       <marker
         class="vg-arrowhead"
         viewBox="0 0 10 10"
-        refX="8" refY="5"
-        markerWidth="6" markerHeight="6"
+        refX="8"
+        refY="5"
+        markerWidth="6"
+        markerHeight="6"
         orient="auto-start-reverse"
       >
-        <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
+        <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"></path>
       </marker>
     </defs>
 
-    {showGrid && range.map((g) => (
-      <g stroke="currentColor" class="text-base-content/10" stroke-width="1">
-        <line x1={toScreen(g, origin === "center" ? -units : 0).x} y1={0}
-              x2={toScreen(g, origin === "center" ? units : 0).x} y2={px} />
-        <line x1={0} y1={toScreen(0, g).y}
-              x2={px} y2={toScreen(origin === "center" ? units : 0, g).y} />
-      </g>
-    ))}
+    {
+      showGrid
+      && range.map(g => (
+          <g stroke="currentColor" class="text-base-content/10" stroke-width="1">
+            <line
+              x1={toScreen(g, origin === 'center' ? -units : 0).x}
+              y1={0}
+              x2={toScreen(g, origin === 'center' ? units : 0).x}
+              y2={px}
+            />
+            <line x1={0} y1={toScreen(0, g).y} x2={px} y2={toScreen(origin === 'center' ? units : 0, g).y} />
+          </g>
+        ))
+    }
 
     {/* axes */}
     <g stroke="currentColor" class="text-base-content/40" stroke-width="1.5">
-      <line x1={cx} y1={0} x2={cx} y2={px} />
-      <line x1={0} y1={cy} x2={px} y2={cy} />
+      <line x1={cx} y1={0} x2={cx} y2={px}></line>
+      <line x1={0} y1={cy} x2={px} y2={cy}></line>
     </g>
     {/* axis labels */}
     <g class="text-base-content/50" font-size="10" font-family="monospace">
@@ -95,93 +97,97 @@ const range = origin === "center"
     </g>
 
     {/* origin dot */}
-    <circle cx={cx} cy={cy} r="2.5" class="fill-base-content/50" />
+    <circle cx={cx} cy={cy} r="2.5" class="fill-base-content/50"></circle>
 
     {/* arrows + dots — owned by the <vector-grid> custom element, drawn on connect */}
     <g class="vg-vectors"></g>
   </svg>
 
-  {caption && (
-    <figcaption class="text-sm text-base-content/60 mt-2 text-center max-w-md">
-      {caption}
-    </figcaption>
-  )}
+  {caption && <figcaption class="text-sm text-base-content/60 mt-2 text-center max-w-md">{caption}</figcaption>}
 
   {/* per-instance props, read by connectedCallback */}
   <script type="application/json" class="vg-props" set:html={JSON.stringify(vectors)} />
 </figure>
 
 <script>
-  import { vec, add, type Vec } from "../lib/vec";
-  import { makeStage, clear, type Stage } from "../lib/svg-stage";
+  import type { Stage } from '../lib/svg-stage'
+  import type { Vec } from '../lib/vec'
+  import { clear, makeStage } from '../lib/svg-stage'
+  import { add, vec } from '../lib/vec'
 
   type VecProp = Vec & {
-    fromX?: number;
-    fromY?: number;
-    color?: string;
-    label?: string;
-    dashed?: boolean;
-    width?: number;
-  };
+    fromX?: number
+    fromY?: number
+    color?: string
+    label?: string
+    dashed?: boolean
+    width?: number
+  }
 
-  const PRIMARY = "var(--color-primary, currentColor)";
+  const PRIMARY = 'var(--color-primary, currentColor)'
 
-  let instanceSeq = 0;
-
-  
+  let instanceSeq = 0
   class VectorGrid extends HTMLElement {
-    #ready = false;
+    #ready = false
 
     connectedCallback(): void {
-      if (this.#ready) return;
-      this.#ready = true;
+      if (this.#ready) {
+        return
+      }
+      this.#ready = true
 
-      const svg = this.querySelector<SVGSVGElement>("svg");
-      const markers = this.querySelectorAll<SVGMarkerElement>("marker.vg-arrowhead");
-      const layer = this.querySelector<SVGGElement>(".vg-vectors");
-      const propsEl = this.querySelector<HTMLScriptElement>("script.vg-props");
-      if (!svg || !layer || !propsEl || markers.length === 0) return;
-
-      const px = Number(this.dataset.size);
-      const units = Number(this.dataset.units);
-      const origin = (this.dataset.origin ?? "center") as "center" | "topleft";
-      const cx = origin === "center" ? px / 2 : 24;
-      const cy = origin === "center" ? px / 2 : 24;
-      const pxPerUnit = (px / 2 - 16) / units;
-
-      const markerId = `vg-ah-${instanceSeq++}`;
-      markers.forEach((m) => { m.id = markerId; });
-      const stage: Stage = makeStage(cx, cy, pxPerUnit, markerId);
-
-      let vectors: VecProp[] = [];
-      try {
-        vectors = JSON.parse(propsEl.textContent ?? "[]") as VecProp[];
-      } catch {
-        vectors = [];
+      const svg = this.querySelector<SVGSVGElement>('svg')
+      const markers = this.querySelectorAll<SVGMarkerElement>('marker.vg-arrowhead')
+      const layer = this.querySelector<SVGGElement>('.vg-vectors')
+      const propsEl = this.querySelector<HTMLScriptElement>('script.vg-props')
+      if (!svg || !layer || !propsEl || markers.length === 0) {
+        return
       }
 
-      clear(layer);
+      const px = Number(this.dataset.size)
+      const units = Number(this.dataset.units)
+      const origin = (this.dataset.origin ?? 'center') as 'center' | 'topleft'
+      const cx = origin === 'center' ? px / 2 : 24
+      const cy = origin === 'center' ? px / 2 : 24
+      const pxPerUnit = (px / 2 - 16) / units
+
+      const markerId = `vg-ah-${instanceSeq++}`
+      markers.forEach((m) => {
+        m.id = markerId
+      })
+      const stage: Stage = makeStage(cx, cy, pxPerUnit, markerId)
+
+      let vectors: VecProp[] = []
+      try {
+        vectors = JSON.parse(propsEl.textContent ?? '[]') as VecProp[]
+      }
+      catch {
+        vectors = []
+      }
+
+      clear(layer)
       for (const v of vectors) {
-        const col = v.color ?? PRIMARY;
-        if ( v.fromX === undefined || v.fromY === undefined) {
+        const col = v.color ?? PRIMARY
+        if (v.fromX === undefined || v.fromY === undefined) {
           // `dashed` is meaningless for a dot and is ignored; `width`, if any,
           // is read as the dot radius in px so authors can size points.
           stage.point(layer, vec(v.x, v.y), col, {
             label: v.label,
             radius: v.width ?? 3,
-          });
-        } else {
-          const from = vec(v.fromX, v.fromY);
-          const to = add(from, vec(v.x, v.y));
+          })
+        }
+        else {
+          const from = vec(v.fromX, v.fromY)
+          const to = add(from, vec(v.x, v.y))
           stage.arrow(layer, from, to, col, {
             width: v.width ?? 2,
             dashed: v.dashed,
             label: v.label,
-          });
+          })
         }
       }
     }
   }
 
-  customElements.define("vector-grid", VectorGrid, { extends: "figure" });
+  customElements.define('vector-grid', VectorGrid, { extends: 'figure' })
 </script>

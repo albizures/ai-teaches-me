@@ -9,7 +9,7 @@ resolved; update a row the moment its meaning shifts.
 ### Static diagram
 
 An SVG figure rendered **server-side** from declarative props (vector list,
-units, caption, …), with **no client script and no runtime state**. It *shows*
+units, caption, …), with **no client script and no runtime state**. It _shows_
 a vector relationship once, the way a figure in a textbook does. It does not
 react to the learner.
 
@@ -22,7 +22,7 @@ react to the learner.
 An SVG figure that **runs client-side** and whose geometry is driven by
 **runtime state** the learner manipulates (dragging handles, switching an
 operation, moving a slider). It exists to be poked at; the figure changes in
-response. The static *shell* (grid, axes, `<defs>`) may still be SSR'd, but
+response. The static _shell_ (grid, axes, `<defs>`) may still be SSR'd, but
 everything that changes with state is owned by a reactive client tree.
 
 - Canonical component: `src/components/VectorOpsPlayground.astro`.
@@ -31,7 +31,7 @@ everything that changes with state is owned by a reactive client tree.
   `astro:page-load` (View Transitions).
 - **Does** use `vanjs-core` as a runtime dependency.
 
-The distinction is *intentional and load-bearing*: a concept that needs only
+The distinction is _intentional and load-bearing_: a concept that needs only
 to be **seen** is a static diagram; a concept that needs to be **felt** by
 manipulation is an interactive playground. `NOTES.md` (both the workspace and
 the `2d-game-math` topic) already rely on this split ("visual examples by
