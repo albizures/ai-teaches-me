@@ -1,0 +1,103 @@
+---
+title: "Coordinate Spaces & Vectors"
+description: "Where pixels live on screen, and how raylib's Vector2 lets you talk about positions and movements in 2D."
+draft: false
+slug: 0001-coordinate-spaces-and-vectors
+publicatedAt: 2026-06-21
+---
+
+import Quiz from '../../../components/Quiz.astro';
+
+Welcome to lesson 1. Before angles, movement, or collision, you need two ideas:
+**where things are** and **how to describe a change in position**. That's coordinate
+spaces and vectors.
+
+## Screen coordinates
+
+Your monitor is a grid of pixels. raylib (and almost every 2D graphics library)
+numbers that grid like this:
+
+- **Origin `(0,0)`** is the **top-left corner**.
+- **`+x` goes right.**
+- **`+y` goes down** — _not_ up. This trips up everyone with a school-math background,
+  where the y-axis pointed up. On a screen, growing `y` moves you toward the bottom.
+
+So a position of `(400, 300)` means "400 pixels from the left, 300 pixels down from
+the top."
+
+This is the heart of why a position is just **two numbers working together**. Which
+brings us to vectors.
+
+## Vectors: two numbers, one thing
+
+A **vector** in 2D is a pair `(x, y)` treated as a single object — a direction
+*and* a length bundled together. In raylib-odin that object is the `rl.Vector2`
+struct:
+
+```odin
+position := rl.Vector2{x: 400, y: 300}
+velocity := rl.Vector2{x: 2, y: 0}   // "move right, 2 px per frame"
+```
+
+The same `Vector2` type is reused for two different jobs:
+
+- **As a position** — *where something is*. `position` above.
+- **As a displacement** — *how something moves*. `velocity` above.
+
+They're the same data type because, mathematically, a point reached by moving from
+the origin *is* the movement vector that got you there. We'll keep the distinction
+honest in the glossary later, but in raylib code you'll use `Vector2` for both.
+
+## Your first win: move a circle
+
+Here is a complete, runnable raylib-odin loop that uses a `Vector2` position and
+moves it by a velocity each frame:
+
+```odin
+package main
+
+import "rl"
+
+main :: proc() {
+    rl.InitWindow(800, 600, "Vector Basics")
+    defer rl.CloseWindow()
+
+    position := rl.Vector2{400, 300}          // start center-ish
+    velocity := rl.Vector2{2, 0}              // move right 2 px/frame
+
+    rl.SetTargetFPS(60)
+    for !rl.WindowShouldClose() {
+        // Apply movement: position = position + velocity
+        position = rl.Vector2Add(position, velocity)
+
+        rl.BeginDrawing()
+        rl.ClearBackground(rl.BLACK)
+        rl.DrawCircleV(position, 20, rl.YELLOW)
+        rl.EndDrawing()
+    }
+}
+```
+
+Run it. You'll see a yellow circle drift right. You just used a vector to drive
+motion — the foundation of every lesson after this.
+
+<Quiz
+  question="In raylib's screen coordinates, what does increasing the y value of a Vector2 do?"
+  options={["Moves the point upward", "Moves the point downward", "Moves the point rightward", "No change at all"]}
+  answer={1}
+  explain="raylib's origin is the top-left, so larger y is further down the screen — the opposite of a math-class y-axis."
+/>
+
+## Sources
+
+- Primary: [Freya Holmer — _Math for Game Devs_ (video series)](https://www.youtube.com/playlist?list=PLImQqTpkuLuaI3lvMR6eg3xQm5MBl5zQb), especially the vectors intro.
+- API: [raylib `Vector2` and `Vector2Add`](https://www.raylib.com/), and the [raylib-odin bindings](https://github.com/raylib-o/raylib-odin) for exact `rl.*` names.
+
+## Next
+
+Lesson 2 (coming up) takes this `(x, y)` object and teaches the operations you'll
+use constantly: add, subtract, scale, length, normalize, and distance. Tell your
+agent when you're ready and it'll open that lesson.
+
+Stuck on anything above? Ask your agent — it can re-explain screen coordinates, show
+another raylib-odin example, or slow down if vectors still feel fuzzy.

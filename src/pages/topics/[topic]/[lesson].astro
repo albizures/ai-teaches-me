@@ -1,0 +1,66 @@
+---
+import { getCollection, render, type DataEntryMap } from 'astro:content';
+import Layout from '../../../layouts/Layout.astro';
+
+type TopicName = Exclude<keyof DataEntryMap, 'topics'>
+
+export async function getStaticPaths() {
+  const topics = await getCollection('topics');
+  const routes: Array<{ params: {topic: string, lesson: string} }> = []
+
+  for (const topic of topics) {
+    const lessons = await getCollection(topic.data.slug as TopicName)
+
+    for (const lesson of lessons) {
+      routes.push({
+        params: {
+          topic: topic.data.slug,
+          lesson: lesson.data.slug,
+        }
+      })
+    }
+  }
+
+  return routes;
+}
+
+
+const { topic, lesson } = Astro.params;
+const topics = await getCollection(topic as TopicName);
+const entry = topics.find((l) => l.data.slug === lesson);
+
+if (!entry) {
+   return Astro.redirect('/404');
+}
+
+const { Content } = await render(entry);
+const ordered = topics
+  .filter((l) => !l.data.draft)
+  .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+const idx = ordered.findIndex((l) => l.id === entry.id);
+const prevLesson = idx > 0 ? ordered[idx - 1] : null;
+const nextLesson = idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1] : null;
+---
+
+<Layout>
+  <article class="relative max-w-3xl mx-auto px-6 py-10 prose">
+    <p class="text-sm text-base-content/50 mb-2 not-prose">
+      <a href={`/topics/${topic}`} class="link link-hover">← All lessons</a>
+    </p>
+    <h1>{entry.data.title}</h1>
+    <p class="lead text-base-content/70">{entry.data.description}</p>
+    <Content />
+    <hr class="my-8" />
+    <nav class="not-prose flex justify-between gap-4 bg-base text-base-content">
+      {prevLesson ? (
+        <a href={`/topics/${topic}/${prevLesson.id}`} class="link link-hover">← {prevLesson.data.title}</a>
+      ) : <span />}
+      {nextLesson ? (
+        <a href={`/topics/${topic}/${nextLesson.id}`} class="link link-hover">{nextLesson.data.title} →</a>
+      ) : <span />}
+    </nav>
+    <div class="not-prose mt-10 alert alert-info bg-base-200/60  text-base-content">
+      <p>Something above unclear? Ask your agent — it's your teacher and can re-explain any part, give another example, or adjust the difficulty.</p>
+    </div>
+  </article>
+</Layout>

@@ -1,0 +1,33 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+
+const topics = (await getCollection('topics'))
+  .filter((t) => !t.data.draft)
+  .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+---
+
+<Layout>
+  <main class="max-w-3xl mx-auto px-6 py-12">
+    <h1 class="text-3xl font-semibold mb-2">Topics</h1>
+    <p class="text-base-content/70 mb-8">A self-directed course log. Each topic lives in its own workspace.</p>
+    {
+      topics.length === 0 ? (
+        <p class="italic text-base-content/50">No topics yet.</p>
+      ) : (
+        <ul class="flex flex-col gap-3">
+          {topics.map((t) => (
+            <li class="card bg-base-200/50 border border-base-content/10">
+              <div class="card-body">
+                <a href={`/topics/${t.id.split('/')[0]}`} class="link link-hover text-xl font-medium">
+                  {t.data.title}
+                </a>
+                <p class="text-base-content/70">{t.data.description}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </main>
+</Layout>

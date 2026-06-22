@@ -1,0 +1,68 @@
+---
+import type { DataEntryMap } from 'astro:content';
+import { getCollection, type CollectionKey } from 'astro:content';
+
+type TopicName = Exclude<keyof DataEntryMap, 'topics'>
+
+type Props = {
+  name: TopicName;
+}
+
+const { name } = Astro.props;
+
+// Every topic owns its own content collection, named after the topic slug.
+// We read it dynamically so the same component serves every topic. The
+// slug is registered as a collection in `src/content.config.ts` before any
+// lesson is authored, so it is present in the generated content types.
+const collectionKey = name as CollectionKey;
+const lessons = (await getCollection(collectionKey))
+  // Skip drafts so published material is what the learner sees.
+  .filter((lesson) => !lesson.data.draft)
+  // Lessons are numbered per topic: `0001-<dash-case-name>.mdx`.
+  // Sort by that leading number so they always appear in teaching order.
+  .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+---
+
+<section class="not-prose my-8">
+  <h2 class="text-2xl font-semibold mb-4">Lessons</h2>
+
+  {
+    lessons.length === 0 ? (
+      <p class="text-base-content/70 italic">
+        No lessons yet. Check back soon — the first one is on its way.
+      </p>
+    ) : (
+      <ol class="steps steps-vertical w-full">
+        {lessons.map((lesson, index) => (
+          <li class="step" data-content={String(index + 1).padStart(2, '0')}>
+            <div class="card shadow-sm">
+              <div class="card-body text-left">
+                <a
+                  href={`/topics/${name}/${lesson.id}`}
+                  class="text-lg font-medium transition-colors"
+                >
+                  <h4>
+                    {lesson.data.title}
+                  </h4>
+                  <p class="text-base-content/70 text-sm mt-1">
+                    {lesson.data.description}
+                  </p>
+                  <time
+                    class="block text-xs text-base-content/50 mt-1"
+                    datetime={lesson.data.publicatedAt.toISOString()}
+                  >
+                    {lesson.data.publicatedAt.toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </time>
+                </a>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    )
+  }
+</section>

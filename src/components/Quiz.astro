@@ -1,0 +1,66 @@
+---
+// Reusable multiple-choice quiz. One question, N options, one correct answer
+// (0-indexed via `answer`). Optional `explain` shown after answering.
+//
+// Options should be near-equal length so formatting doesn't leak the answer.
+type Props = {
+  question: string;
+  options: string[];
+  answer: number;
+  explain?: string;
+};
+
+const { question, options, answer, explain } = Astro.props;
+const id = `quiz-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<div class="quiz not-prose my-6 p-5 rounded-box border border-base-content/15 bg-base-200/40" data-answer={answer} data-explain={explain ?? ""} id={id}>
+  <p class="font-medium mb-3">{question}</p>
+  <div class="flex flex-col gap-2">
+    {options.map((opt, i) => (
+      <button
+        type="button"
+        class="quiz-option btn btn-dash justify-start text-left normal-case font-normal whitespace-normal h-auto py-2"
+        data-index={i}
+      >
+        <span class="font-mono opacity-60">{String.fromCharCode(65 + i)}.</span>
+        <span>{opt}</span>
+      </button>
+    ))}
+  </div>
+  <p class="quiz-feedback mt-4 text-sm min-h-[1.25rem]"></p>
+</div>
+
+<script>
+  function bindQuizzes() {
+    document.querySelectorAll<HTMLElement>('.quiz').forEach((quiz) => {
+      if (quiz.dataset.bound === '1') return;
+      quiz.dataset.bound = '1';
+      const answer = Number(quiz.dataset.answer);
+      const explain = quiz.dataset.explain ?? '';
+      const feedback = quiz.querySelector<HTMLElement>('.quiz-feedback');
+      quiz.querySelectorAll<HTMLButtonElement>('.quiz-option').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.dataset.index);
+          const correct = idx === answer;
+          quiz.querySelectorAll<HTMLButtonElement>('.quiz-option').forEach((b) => {
+            b.classList.remove('btn-success', 'btn-error');
+            b.disabled = true;
+          });
+          btn.classList.add(correct ? 'btn-success' : 'btn-error');
+          if (!correct) {
+            quiz.querySelector<HTMLButtonElement>(`.quiz-option[data-index="${answer}"]`)?.classList.add('btn-success');
+          }
+          if (feedback) {
+            feedback.textContent = correct
+              ? (explain ? `Correct. ${explain}` : 'Correct.')
+              : (explain ? `Not quite — ${explain}` : 'Not quite. Re-read the section above.');
+          }
+        });
+      });
+    });
+  }
+  bindQuizzes();
+  // Re-bind on Astro client-side navigation.
+  document.addEventListener('astro:page-load', bindQuizzes);
+</script>
