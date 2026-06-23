@@ -1,4 +1,6 @@
 ---
+import CartesianPlane from './CartesianPlane.astro'
+
 type Common = {
   color?: string
   label?: string
@@ -33,22 +35,7 @@ type Props = {
 const { points = [], vectors = [], size = 320, units = 5, origin = 'center', showGrid = true, caption } = Astro.props
 
 const px = size
-const cx = origin === 'center' ? px / 2 : 24
-const cy = origin === 'center' ? px / 2 : 24
-const scale = (px / 2 - 16) / units // leave a margin
 
-function toScreen(gx: number, gy: number) {
-  return {
-  x: cx + gx * scale,
-  y: cy + gy * scale, // +y down, like a screen
-}
-}
-
-// Grid lines from -units..+units (center) or 0..units (topleft).
-const range
-  = origin === 'center'
-    ? Array.from({ length: units * 2 + 1 }, (_, i) => i - units)
-    : Array.from({ length: units + 1 }, (_, i) => i)
 ---
 
 <figure
@@ -59,60 +46,9 @@ const range
   data-origin={origin}
   data-show-grid={showGrid ? '1' : '0'}
 >
-  <svg
-    viewBox={`0 0 ${px} ${px}`}
-    width="100%"
-    style={`max-width:${px}px; aspect-ratio:1;`}
-    class="rounded-box border border-base-content/15 bg-base-200/30"
-    role="img"
-    aria-label={caption ?? 'Vector diagram'}
-  >
-    <defs>
-      <marker
-        class="vg-arrowhead"
-        viewBox="0 0 10 10"
-        refX="8"
-        refY="5"
-        markerWidth="6"
-        markerHeight="6"
-        orient="auto-start-reverse"
-      >
-        <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"></path>
-      </marker>
-    </defs>
-
-    {
-      showGrid
-      && range.map(g => (
-          <g stroke="currentColor" class="text-base-content/10" stroke-width="1">
-            <line
-              x1={toScreen(g, origin === 'center' ? -units : 0).x}
-              y1={0}
-              x2={toScreen(g, origin === 'center' ? units : 0).x}
-              y2={px}
-            />
-            <line x1={0} y1={toScreen(0, g).y} x2={px} y2={toScreen(origin === 'center' ? units : 0, g).y} />
-          </g>
-        ))
-    }
-
-    {/* axes */}
-    <g stroke="currentColor" class="text-base-content/40" stroke-width="1.5">
-      <line x1={cx} y1={0} x2={cx} y2={px}></line>
-      <line x1={0} y1={cy} x2={px} y2={cy}></line>
-    </g>
-    {/* axis labels */}
-    <g class="text-base-content/50" font-size="10" font-family="monospace">
-      <text x={px - 12} y={cy - 4} text-anchor="end">+x</text>
-      <text x={cx + 4} y={px - 6}>+y</text>
-    </g>
-
-    {/* origin dot */}
-    <circle cx={cx} cy={cy} r="2.5" class="fill-base-content/50"></circle>
-
-    {/* arrows + dots — owned by the <vector-grid> custom element, drawn on connect */}
+  <CartesianPlane size={size} units={units} origin={origin} showGrid={showGrid} caption={caption}>
     <g class="vg-vectors"></g>
-  </svg>
+  </CartesianPlane>
 
   {caption && <figcaption class="text-sm text-base-content/60 mt-2 text-center max-w-md">{caption}</figcaption>}
 

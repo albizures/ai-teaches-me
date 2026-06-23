@@ -1,26 +1,51 @@
 ---
+import CartesianPlane from './CartesianPlane.astro'
+
 type Props = {
   size?: number
   units?: number
 }
-
 const { size = 340, units = 5 } = Astro.props
+
+
 ---
 
 <vector-ops-playground
   data-size={size}
   data-units={units}
 >
-<div class="vop-root not-prose my-6 p-4 rounded-box border border-base-content/15 bg-base-200/30"></div>
+  <div class="grid grid-cols-2 gap-4 not-prose my-6 p-4 flex rounded-box border border-base-content/15 bg-base-200/30">
+    <div class="vector-grid flex flex-col items-center">
+      <CartesianPlane size={size} units={5} />
+    </div>
+    <div class="tabs tabs-lift tabs-sm">
+      <input type="radio" name="vop-result" value="add" class="tab" aria-label="Add" checked="checked" />
+      <div class="tab-content bg-base-100 border-base-300 p-4 add-result"></div>
+
+      <input type="radio" name="vop-result" value="subtrack" class="tab" aria-label="Subtrack" />
+      <div class="tab-content bg-base-100 border-base-300 p-4 subtrack-result"></div>
+
+      <input type="radio" name="vop-result" value="scale" class="tab" aria-label="Scale" />
+      <div class="tab-content bg-base-100 border-base-300 p-4 scale-result"></div>
+
+      <input type="radio" name="vop-result" value="normalize" class="tab" aria-label="Normalize" />
+      <div class="tab-content bg-base-100 border-base-300 p-4 normalize-result"></div>
+
+      <input type="radio" name="vop-result" value="distance" class="tab" aria-label="Distance" />
+      <div class="tab-content bg-base-100 border-base-300 p-4 distance-result"></div>
+    </div>
+  </div>
 </vector-ops-playground>
 
 <script>
 import type { State as VanState } from 'vanjs-core'
 import type { Vec } from '../lib/vec'
 import type { Op, ViewCtx } from './vector-ops/views'
+import { on, query, queryAll, selectIn } from '@vyke/dom'
 import van from 'vanjs-core'
+import { assert } from '../lib/errors'
 import { clamp, vec } from '../lib/vec'
-import { a, circle, defs, div, g, input, label, line, marker, p, path, span, svg, text } from './elements'
+import { circle, defs, div, g, input, label, marker, p, path, span, text } from './elements'
 import {
   Readout,
   ResultAdd,
@@ -31,14 +56,11 @@ import {
 } from './vector-ops/views'
 
 const COL = {
-  a: 'oklch(0.7 0.18 30)', // warm (A)
-  b: 'oklch(0.65 0.16 220)', // cool (B)
+  a: 'oklch(0.7 0.18 30 / 0.5)', // warm (A)
+  b: 'oklch(0.65 0.16 220 / 0.5)', // cool (B)
   result: 'var(--color-primary, oklch(0.7 0.18 330))',
   muted: 'var(--color-base-content, #888)',
 }
-
-const axisColor = 'color-mix(in oklch, currentColor 45%, transparent)'
-const gridColor = 'color-mix(in oklch, currentColor 12%, transparent)'
 
 // Module-level monotonic counter for the arrowhead marker id
 let vopSeq = 0
@@ -50,11 +72,22 @@ const STAGE_MARGIN_PX = 18
 
 customElements.define('vector-ops-playground', class extends HTMLElement {
   connectedCallback(): void {
-    const root = this.querySelector<HTMLDivElement>('.vop-root')
-
-    if (root!.childElementCount > 0) {
+    if (this.dataset.init) {
       return
     }
+
+    this.dataset.init = 'true'
+    const [addDiv, subtrackDiv, scaleDiv, normalizeDiv, distanceDiv, cartesianPlane, tabs] = selectIn(this,
+      query<HTMLDivElement>('.add-result'),
+      query<HTMLDivElement>('.subtrack-result'),
+      query<HTMLDivElement>('.scale-result'),
+      query<HTMLDivElement>('.normalize-result'),
+      query<HTMLDivElement>('.distance-result'),
+      query<SVGElement>('.cartesian-plane'),
+      queryAll<HTMLInputElement>('[name=vop-result]'),
+    )
+
+    assert(cartesianPlane, 'Missing cartesian plane')
 
     const px = Number(this.dataset.size)
     const units = Number(this.dataset.units)
@@ -69,20 +102,38 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
     const op = van.state<Op>('add')
     const k = van.state<number>(2)
 
+    for (const tab of tabs) {
+      on(tab, 'click', (event) => {
+        const target = event.target
+        assert(target instanceof HTMLInputElement, 'invalid event')
+
+        op.val = target.value as Op
+      })
+    }
+
     const ctx: ViewCtx = { A, B, op, k, pt, markerId, COL }
 
-    // --- static grid + axes (built once; never react to state) ----------
-    const gridRange = Array.from({ length: units * 2 + 1 }, (_, i) => i - units)
-    const sxN = (gN: number) => cx + gN * pxPerUnit
-    const syN = (gN: number) => cy + gN * pxPerUnit
-
-    const gridLayer = g({ 'class': 'grid-layer', 'stroke': gridColor, 'stroke-width': 1 }, ...gridRange.flatMap(gN => [
-      line({ x1: sxN(gN), y1: 0, x2: sxN(gN), y2: px }),
-      line({ x1: 0, y1: syN(gN), x2: px, y2: syN(gN) }),
-    ]))
-    const axesLayer = g({ 'class': 'axes-layer', 'stroke': axisColor, 'stroke-width': 1.5 },
-      line({ x1: cx, y1: 0, x2: cx, y2: px }),
-      line({ x1: 0, y1: cy, x2: px, y2: cy }),
+    const scaleOnly = div(
+      { class: () => `scale-only mb-3${op.val === 'scale' ? '' : ' hidden'}` },
+      label(
+        { class: 'text-sm flex items-center justify-between' },
+        span({}, 'scale factor ', span({ class: 'badge badge-ghost badge-sm font-mono' }, 'k')),
+        span({ class: 'font-mono' }, () => k.val.toFixed(1)),
+      ),
+      input({
+        type: 'range',
+        min: -3,
+        max: 3,
+        step: 0.1,
+        value: 2,
+        class: 'range range-sm range-primary',
+        oninput(event: Event) {
+          const target = event.target
+          assert(target instanceof HTMLInputElement, 'Invalid range')
+          k.val = Number(target.value)
+        },
+      }),
+      p({ class: 'text-xs text-base-content/50 mt-1' }, 'k > 1 stretches · 0<k<1 shrinks · k < 0 flips direction.'),
     )
 
     const resultLayer = g({ class: 'result-layer' }, () => {
@@ -98,7 +149,13 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
       return ResultDistance(ctx)
     })
 
-    const handle = (atom: VanState<Vec>, which: 'A' | 'B', color: string, glyph: string): SVGGElement => g({},
+    van.add(addDiv!, Readout('add', ctx))
+    van.add(subtrackDiv!, Readout('subtract', ctx))
+    van.add(scaleDiv!, scaleOnly, Readout('scale', ctx))
+    van.add(normalizeDiv!, Readout('normalize', ctx))
+    van.add(distanceDiv!, Readout('distance', ctx))
+
+    const Handle = (atom: VanState<Vec>, which: 'A' | 'B', color: string, glyph: string): SVGGElement => g({},
       circle({
         'cx': () => pt(atom.val).x,
         'cy': () => pt(atom.val).y,
@@ -116,16 +173,12 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
       }, glyph),
     )
 
-    const handlesLayer = g({ class: 'handles-layer', style: 'cursor: grab' }, handle(A, 'A', COL.a, 'A'), handle(B, 'B', COL.b, 'B'))
+    const handlesLayer = g({ class: 'handles-layer', style: 'cursor: grab' },
+      Handle(A, 'A', COL.a, 'A'),
+      Handle(B, 'B', COL.b, 'B'),
+    )
 
-    // --- the <svg> stage -----------------------------------------------
-    const svgEl = svg(
-      {
-        viewBox: `0 0 ${px} ${px}`,
-        width: px,
-        height: px,
-        class: 'rounded-box border border-base-content/15 bg-base-100 touch-none select-none',
-      },
+    van.add(cartesianPlane!,
       defs({}, marker(
         {
           id: markerId,
@@ -138,79 +191,14 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
         },
         path({ d: 'M0,0 L10,5 L0,10 z', fill: 'context-stroke' }),
       )),
-      gridLayer,
-      axesLayer,
-      resultLayer, // drawn first so A/B handles sit on top
+      resultLayer,
       handlesLayer,
     )
-
-    const tabs: Array<[Op, string]> = [
-      ['add', 'Add'],
-      ['subtract', 'Subtract'],
-      ['scale', 'Scale'],
-      ['normalize', 'Normalize'],
-      ['distance', 'Distance'],
-    ]
-    const tablist = div({
-      role: 'tablist',
-      class: 'tabs tabs-boxed tabs-sm flex-wrap mb-3',
-      onclick: (e: MouseEvent) => {
-        const t = (e.target as HTMLElement).closest<HTMLElement>('[role="tab"]')
-        if (!t) {
-          return
-        }
-        op.val = t.dataset.op as Op
-      },
-    },
-    ...tabs.map(([o, glyph]) => a({
-      'role': 'tab',
-      'data-op': o,
-      'class': () => `tab${op.val === o ? ' tab-active' : ''}`,
-    },
-    glyph,
-    )),
-    )
-
-    const scaleOnly = div(
-      { class: () => `scale-only mb-3${op.val === 'scale' ? '' : ' hidden'}` },
-      label(
-        { class: 'text-sm flex items-center justify-between' },
-        span({}, 'scale factor ', span({ class: 'badge badge-ghost badge-sm font-mono' }, 'k')),
-        span({ class: 'font-mono' }, () => k.val.toFixed(1)),
-      ),
-      input({
-        type: 'range',
-        min: -3,
-        max: 3,
-        step: 0.1,
-        value: 2,
-        class: 'range range-sm range-primary',
-        oninput: (e: Event) => {
-          k.val = Number((e.target as HTMLInputElement).value)
-        },
-      }),
-      p({ class: 'text-xs text-base-content/50 mt-1' }, 'k > 1 stretches · 0<k<1 shrinks · k < 0 flips direction.'),
-    )
-
-    van.add(root!, div(
-      { class: 'flex flex-col lg:flex-row gap-4 items-start' },
-      div(
-        { class: 'flex-shrink-0 mx-auto' },
-        svgEl,
-        p({ class: 'text-xs text-base-content/50 mt-1 text-center' }, 'Drag the colored dots. Switch the operation below.'),
-      ),
-      div(
-        { class: 'flex-1 min-w-0 w-full' },
-        tablist,
-        scaleOnly,
-        Readout(ctx),
-      ),
-    ))
 
     let dragging: 'A' | 'B' | null = null
 
     const toData = (evt: PointerEvent): Vec => {
-      const rect = svgEl.getBoundingClientRect()
+      const rect = cartesianPlane.getBoundingClientRect()
       const sxp = ((evt.clientX - rect.left) / rect.width) * px
       const syp = ((evt.clientY - rect.top) / rect.height) * px
       const gx = (sxp - cx) / pxPerUnit
@@ -218,14 +206,14 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
       return vec(clamp(gx, -units, units), clamp(gy, -units, units))
     }
 
-    svgEl.addEventListener('pointerdown', (e) => {
+    on(cartesianPlane, 'pointerdown', (e) => {
       const h = (e.target as Element).getAttribute?.('data-handle')
       if (h === 'A' || h === 'B') {
         dragging = h
-        svgEl.setPointerCapture(e.pointerId)
+        cartesianPlane.setPointerCapture(e.pointerId)
       }
     })
-    svgEl.addEventListener('pointermove', (e) => {
+    on(cartesianPlane, 'pointermove', (e) => {
       if (!dragging) {
         return
       }
@@ -239,11 +227,11 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
         B.val = d
       }
     })
-    svgEl.addEventListener('pointerup', (e) => {
+    on(cartesianPlane, 'pointerup', (e) => {
       dragging = null
-      svgEl.releasePointerCapture?.(e.pointerId)
+      cartesianPlane.releasePointerCapture?.(e.pointerId)
     })
-    svgEl.addEventListener('pointercancel', () => {
+    on(cartesianPlane, 'pointercancel', () => {
       dragging = null
     })
   }

@@ -1,7 +1,9 @@
-import type { TagFunc, State as VanState } from 'vanjs-core'
+import type { State as VanState } from 'vanjs-core'
 import type { Vec } from '../../lib/vec'
 import van from 'vanjs-core'
 import { add, distance, fmt, length, normalize, scale, sub } from '../../lib/vec'
+import { circle, g, line } from '../elements'
+import { VectorLabel } from '../VectorLabel'
 
 export type Op = 'add' | 'subtract' | 'scale' | 'normalize' | 'distance'
 
@@ -25,15 +27,6 @@ export type ViewCtx = {
   COL: ColMap
 }
 
-const NS = 'http://www.w3.org/2000/svg'
-
-const { g, line, circle, text } = van.tags(NS) as unknown as {
-  g: TagFunc<SVGGElement>
-  line: TagFunc<SVGLineElement>
-  circle: TagFunc<SVGCircleElement>
-  text: TagFunc<SVGTextElement>
-}
-
 const ORIGIN = () => ({ x: 0, y: 0 })
 
 type ArrowOpts = {
@@ -43,38 +36,12 @@ type ArrowOpts = {
   label?: string | (() => string)
 }
 
-type LabelProps = {
-  label?: (() => string) | undefined
-  color: string
-  x: (() => number) | number
-  y: (() => number) | number
-}
-
-function Label(p: LabelProps) {
-  if (p.label === undefined) {
-    return undefined
-  }
-
-  return text({
-    'x': typeof p.x === 'function' ? p.x : p.x,
-    'y': typeof p.y === 'function' ? p.y : p.y,
-    'font-size': 12,
-    'font-family': 'monospace',
-    'style': `fill: ${p.color}; pointer-events: none`,
-  }, p.label)
-}
-
 type GetVec = () => Vec
 
 function Arrow(ctx: ViewCtx, from: GetVec, to: GetVec, color: string, opts: ArrowOpts = {}): SVGGElement {
   const { pt, markerId } = ctx
   const a = () => pt(from())
   const b = () => pt(to())
-  const labelFn = opts.label === undefined
-    ? undefined
-    : typeof opts.label === 'function'
-      ? opts.label
-      : () => opts.label as string
   return g({},
     line({
       'x1': () => a().x,
@@ -88,8 +55,8 @@ function Arrow(ctx: ViewCtx, from: GetVec, to: GetVec, color: string, opts: Arro
       'stroke-dasharray': opts.dashed ? '5 4' : null,
       'marker-end': `url(#${markerId})`,
     }),
-    Label({
-      label: labelFn,
+    VectorLabel({
+      label: opts.label,
       color,
       x: () => (a().x + b().x) / 2,
       y: () => (a().y + b().y) / 2 - 6,
@@ -167,14 +134,14 @@ export function ResultDistance(ctx: ViewCtx): SVGGElement {
       'x2': () => pt(B.val).x,
       'y2': () => pt(B.val).y,
       'stroke-dasharray': '5 4',
-      'stroke-width': 4,
+      'stroke-width': 2,
       'style': `stroke: ${COL.result};`,
       'marker-end': `url(#${markerId})`,
     }),
   )
 }
 
-function linesFor(op: Op, ctx: ViewCtx): (() => string)[] {
+export function linesFor(op: Op, ctx: ViewCtx): (() => string)[] {
   const { A, B, k } = ctx
   if (op === 'add') {
     const sum = () => add(A.val, B.val)
@@ -222,16 +189,12 @@ function linesFor(op: Op, ctx: ViewCtx): (() => string)[] {
   ]
 }
 
-export function Readout(ctx: ViewCtx): HTMLElement {
+export function Readout(op: Op, ctx: ViewCtx): HTMLElement {
   const { div } = van.tags
   return div({
-    class: 'font-mono text-sm bg-base-100 rounded-box p-3 border border-base-content/10 space-y-1',
+    class: 'font-mono text-sm space-y-1',
   }, () => {
-    // Reading `op.val` here registers the dep that swaps the line set on
-    // op change. A/B/k are *not* read at this level — each line reads them
-    // itself, so dragging/slding point-updates a single Text node.
-    const op = ctx.op.val
-    const lines = linesFor(op, ctx)
+    const lines = linesFor(op ?? ctx.op.val, ctx)
     return div({}, ...lines.map(l => div({}, l)))
   })
 }
