@@ -5,5 +5,6 @@ export default antfu({
   markdown: true,
   rules: {
     'ts/consistent-type-definitions': ['error', 'type'],
+    'antfu/consistent-list-newline': ['off'],
   },
 })
