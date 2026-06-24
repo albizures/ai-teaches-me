@@ -15,7 +15,9 @@ export async function getStaticPaths() {
     )
 
     for (const entry of references) {
-      if (entry.data.draft) continue
+      if (entry.data.draft) {
+        continue
+      }
       routes.push({
         params: {
           topic: topic.data.slug,

@@ -51,7 +51,7 @@ const px = size
   {caption && <figcaption class="text-sm text-base-content/60 mt-2 text-center max-w-md">{caption}</figcaption>}
 
   {/* per-instance props, read by connectedCallback */}
-  <script type="application/json" class="vg-props" set:html={JSON.stringify({ points, vectors })} />
+  <script is:inline type="application/json" class="vg-props" set:html={JSON.stringify({ points, vectors })} />
 </figure>
 
 <script>
