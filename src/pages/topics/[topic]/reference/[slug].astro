@@ -1,0 +1,56 @@
+---
+import type { DataEntryMap } from 'astro:content'
+import { getCollection, render } from 'astro:content'
+import Layout from '../../../../layouts/Layout.astro'
+
+type TopicName = Exclude<keyof DataEntryMap, 'topics'>
+
+export async function getStaticPaths() {
+  const topics = await getCollection('topics')
+  const routes: Array<{ params: { topic: string, slug: string } }> = []
+
+  for (const topic of topics) {
+    const references = await getCollection(
+      `${topic.data.slug}-reference` as TopicName,
+    )
+
+    for (const entry of references) {
+      if (entry.data.draft) continue
+      routes.push({
+        params: {
+          topic: topic.data.slug,
+          slug: entry.data.slug,
+        },
+      })
+    }
+  }
+
+  return routes
+}
+
+const { topic, slug } = Astro.params
+const references = await getCollection(`${topic}-reference` as TopicName)
+const entry = references.find(r => r.data.slug === slug)
+
+if (!entry) {
+  return Astro.redirect('/404')
+}
+
+const { Content } = await render(entry)
+---
+
+<Layout>
+  <article class="relative max-w-3xl mx-auto px-6 py-10 prose">
+    <p class="text-sm text-base-content/50 mb-2 not-prose">
+      <a href={`/topics/${topic}`} class="link link-hover">← Module</a>
+    </p>
+    <h1>{entry.data.title}</h1>
+    <Content />
+    <div class="not-prose mt-10 alert alert-info bg-base-200/60 text-base-content">
+      <p>
+        Something above unclear? Ask your agent — it's your teacher and can re-explain any part, give another example,
+        or adjust the difficulty.
+      </p>
+    </div>
+  </article>
+</Layout>

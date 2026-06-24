@@ -10,6 +10,13 @@ const sharedSchema = z.object({
   slug: z.string(),
 })
 
+const referenceSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  draft: z.boolean(),
+  description: z.string().optional(),
+})
+
 // One entry per topic: the `index.mdx` that describes the topic and lists its
 // lessons. Lives at `./src/topics/<slug>/index.mdx`.
 const topics = defineCollection({
@@ -17,14 +24,19 @@ const topics = defineCollection({
   schema: sharedSchema,
 })
 
-// A topic owns its own lessons collection, named after the topic slug. Add one
-// block per topic. Lesson files live at `./src/topics/<slug>/lessons/*.mdx`.
+// -- 2d-game-math --
 const lessons_2d_game_math = defineCollection({
   loader: glob({ pattern: '*.mdx', base: './src/topics/2d-game-math/lessons' }),
   schema: sharedSchema,
 })
 
+const reference_2d_game_math = defineCollection({
+  loader: glob({ pattern: '*.mdx', base: './src/topics/2d-game-math/reference' }),
+  schema: referenceSchema,
+})
+
 export const collections = {
   topics,
   '2d-game-math': lessons_2d_game_math,
+  '2d-game-math-reference': reference_2d_game_math,
 }

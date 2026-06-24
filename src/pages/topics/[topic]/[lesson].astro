@@ -40,12 +40,23 @@ const ordered = topics
 const idx = ordered.findIndex(l => l.id === entry.id)
 const prevLesson = idx > 0 ? ordered[idx - 1] : null
 const nextLesson = idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1] : null
+
+// Reference docs for this topic (glossary, ...). Enumerated generically so
+// future reference docs appear here automatically — no hardcoded glossary path.
+const references = (
+  await getCollection(`${topic}-reference` as TopicName)
+).filter(r => !r.data.draft)
 ---
 
 <Layout>
   <article class="relative max-w-3xl mx-auto px-6 py-10 prose">
-    <p class="text-sm text-base-content/50 mb-2 not-prose">
+    <p class="text-sm text-base-content/50 mb-2 not-prose flex flex-wrap items-center gap-x-3 gap-y-1">
       <a href={`/topics/${topic}`} class="link link-hover">← All lessons</a>
+      {references.map(ref => (
+        <a href={`/topics/${topic}/reference/${ref.data.slug}`} class="link link-hover">
+          {ref.data.title}
+        </a>
+      ))}
     </p>
     <h1>{entry.data.title}</h1>
     <p class="lead text-base-content/70">{entry.data.description}</p>
@@ -54,23 +65,23 @@ const nextLesson = idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1] : nul
     <nav class="not-prose flex justify-between gap-4 bg-base text-base-content">
       {
         prevLesson
-? (
+      ? (
           <a href={`/topics/${topic}/${prevLesson.id}`} class="link link-hover">
             ← {prevLesson.data.title}
           </a>
         )
-: (
+      : (
           <span />
         )
       }
       {
         nextLesson
-? (
+      ? (
           <a href={`/topics/${topic}/${nextLesson.id}`} class="link link-hover">
             {nextLesson.data.title} →
           </a>
         )
-: (
+      : (
           <span />
         )
       }

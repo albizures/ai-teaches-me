@@ -1,4 +1,8 @@
-# 2D Game Math Glossary
+---
+title: "2D Game Math Glossary"
+draft: false
+slug: glossary
+---
 
 The canonical vocabulary for this topic — vectors, angles, movement, and collision as used in a 2D top-down shooter written in Odin + raylib. Terms are added here only once the learner has demonstrated understanding.
 
@@ -6,10 +10,28 @@ The canonical vocabulary for this topic — vectors, angles, movement, and colli
 
 _(No terms yet. Entries are added as concepts are understood in lessons — the act of compressing a concept into a tight definition is itself evidence of learning.)_
 
-<!-- Example format once terms land:
-
 **Vector (Vector2)**:
 A pair of `(x, y)` numbers describing both a direction and a length in 2D space. In raylib-odin it is the `rl.Vector2` struct.
 _Avoid_: point (a point is a position; a vector is a direction+length — distinct in this topic)
 
--->
+**Subtract (`rl.Vector2Subtract(B, A)`)**:
+Returns a `Vector2` — the arrow that carries you **from `A` to `B`**. It keeps both direction *and* length, so you can steer with it (normalize, scale, feed to `atan2`).
+_Use when_: you care which way the result points.
+
+**Distance (`rl.Vector2Distance(A, B)`)**:
+Returns a `float` — only the **length** of the gap between two points, with the direction discarded. It is exactly `Vector2Length(Vector2Subtract(B, A))` bundled into one helper.
+_Use when_: you only care how far apart things are (range checks, aggro radius).
+_Avoid_: computing distance *and* subtract separately for the same pair every frame — take the subtract once and reuse it, or you run Pythagoras twice.
+
+### Subtract vs Distance — the quick test
+
+Ask: **"Do I care which way the arrow points, or only how long it is?"**
+
+- Only how long → **Distance** (a number, e.g. `if d < aggro_range`)
+- Which way it points → **Subtract** (a vector, e.g. aim/steer the enemy)
+
+| Goal | Operation |
+|---|---|
+| Steer an enemy toward the player | Subtract → Normalize → Scale |
+| "Is player within range?" yes/no | Distance (compare to a number) |
+| Angle from enemy to player (`atan2`) | Subtract (needs the vector) |
