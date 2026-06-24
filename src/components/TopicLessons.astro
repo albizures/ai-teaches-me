@@ -1,5 +1,6 @@
 ---
-import type { CollectionKey, DataEntryMap } from 'astro:content'
+import type { CollectionKey, DataEntryMap, RenderedContent } from 'astro:content'
+import type { SharedData } from '../content.config'
 import { getCollection } from 'astro:content'
 
 type TopicName = Exclude<keyof DataEntryMap, 'topics'>
@@ -9,6 +10,15 @@ type Props = {
 }
 
 const { name } = Astro.props
+
+type Item = {
+  id: string
+  body?: string
+  collection: string
+  data: SharedData
+  rendered?: RenderedContent
+  filePath?: string
+}
 
 // Every topic owns its own content collection, named after the topic slug.
 // We read it dynamically so the same component serves every topic. The
@@ -20,7 +30,7 @@ const lessons = (await getCollection(collectionKey))
   .filter(lesson => !lesson.data.draft)
   // Lessons are numbered per topic: `0001-<dash-case-name>.mdx`.
   // Sort by that leading number so they always appear in teaching order.
-  .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
+  .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })) as Array<Item>
 ---
 
 <section class="not-prose my-8">

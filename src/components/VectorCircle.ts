@@ -2,8 +2,7 @@ import type { State } from 'vanjs-core'
 import type { Vec } from '../lib/vec'
 import van from 'vanjs-core'
 import { style } from '../lib/vanjs'
-import { circle, g } from './elements'
-import { VectorLabel } from './VectorLabel'
+import { circle } from './elements'
 
 type VectorCircleProps = {
   radius: number

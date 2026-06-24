@@ -2,6 +2,7 @@ import { glob } from 'astro/loaders'
 import { z } from 'astro/zod'
 import { defineCollection } from 'astro:content'
 
+export type SharedData = z.infer<typeof sharedSchema>
 const sharedSchema = z.object({
   title: z.string(),
   description: z.string(),
