@@ -25,7 +25,7 @@ Inside `./src/topics/<slug>/` (referred to below as the **topic directory**):
 
 - `index.mdx`: The main file where the topic is described and each lesson is listed by using Astro content collections using `./src/component/TopicLessons.astro`.
 - `MISSION.md`: A document capturing the _reason_ the user is interested in the topic. This should be used to ground all teaching. Use the format in [MISSION-FORMAT.md](./MISSION-FORMAT.md).
-- `./reference/*.mdx`: A directory of reference materials. These are the compressed learnings from the lessons - cheat sheets, reference algorithms, syntax, yoga poses, glossaries. They are the raw units of learning. They should be beautiful documents which print out well, and are designed for quick reference.
+- `./reference/*.mdx`: A directory of reference materials. These are the compressed learnings from the lessons - cheat sheets, reference algorithms, syntax, yoga poses, glossaries. They are the raw units of learning. They should be beautiful documents which print out well, and are designed for quick reference. Each `*.mdx` here is served by the topic's `<topic>-reference` content collection at the route `/topics/<topic>/reference/<slug>` (see [Reference Documents](#reference-documents)).
   - Check [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md)
 - `RESOURCES.md`: A list of resources which can be explored to ground your teaching in contextual knowledge, or to acquire knowledge and wisdom. Use the format in [RESOURCES-FORMAT.md](./RESOURCES-FORMAT.md).
 - `./learning-records/*.md`: A directory of learning records, which capture what the user has learned. These are loosely equivalent to architectural decision records in software development - they capture non-obvious lessons and key insights that may need to be revised later, or drive future sessions. These should be used to calculate the zone of proximal development. They are titled `0001-<dash-case-name>.md`, where the number **resets to 0001 for each topic**. Use the format in [LEARNING-RECORD-FORMAT.md](./LEARNING-RECORD-FORMAT.md).
@@ -67,18 +67,26 @@ Fluency can give the user an illusory sense of mastery, but storage strength is 
 
 ## Topic
 
-During initialization create a new content collection for the topic. This is done by updating `./src/content.config.ts` and defining the collection using the topic slug.
+During initialization create **two** content collections for the topic — one for lessons, one for reference docs. This is done by updating `./src/content.config.ts`.
 
-The schema should be:
+The lessons collection is keyed by the topic slug and uses:
 - title: string
 - slug: string
 - description: string
 - draft: boolean
 - publicatedAt: date
 
-Then create `./src/topics/<slugs>/index.mdx` where the topic and mission is described, and the lessons will be listed using `./src/component/TopicLessons.astro`.
+The reference collection is keyed `<topic>-reference` (e.g. `2d-game-math-reference`), globs `./src/topics/<topic>/reference/*.mdx`, and uses the relaxed `referenceSchema`:
+- title: string (required)
+- slug: string (required)
+- draft: boolean (required)
+- description: string (optional — omitted by living glossaries, left open for future reference docs / an index page)
 
-The slug should be consisten between the frontmatter and the folder name.
+It deliberately **does not** reuse the lessons schema: `publicatedAt`/`description` are nonsense for a living reference document that grows over time.
+
+Then create `./src/topics/<slug>/index.mdx` where the topic and mission is described, and the lessons will be listed using `./src/components/TopicLessons.astro`.
+
+The slug should be consistent between the frontmatter and the folder name.
 
 ## Lessons
 
@@ -176,6 +184,17 @@ Some learning topics lend themselves to reference:
 - Glossaries for any topic with its own nomenclature
 
 Glossaries, in particular, are an essential reference. Once one is created, it should be adhered to in every lesson.
+
+### Making reference docs reachable
+
+A `*.mdx` file under `./src/topics/<topic>/reference/` is **not** reachable from the browser just by existing — Astro only generates a route for a registered content collection. Each topic therefore owns a `<topic>-reference` collection (see [Topic](#topic)), and the shared dynamic route `./src/pages/topics/[topic]/reference/[slug].astro` serves every reference doc at `/topics/<topic>/reference/<slug>`. This mirrors the file path so future `reference/*.mdx` docs get routes for free and never collide with lesson slugs.
+
+When adding a reference doc, make it reachable from two places (do not rely on the route alone):
+
+- **Topic index (`index.mdx`):** author a `## Reference` section (typically placed after the "What you'll be able to do" list and before `<TopicLessons name="<topic>" />`) linking to the doc. Authored MDX uses a hardcoded literal path (`/topics/<topic>/reference/<slug>`) — a broken link if the file moves is the accepted trade-off of authored content. Do **not** generate this strip from the route; the user wants it authored.
+- **Lesson pages:** the lesson route (`[lesson].astro`) breadcrumb generically enumerates the topic's `<topic>-reference` collection and renders one link per non-draft reference doc (title → `/topics/<topic>/reference/<slug>`). Today that is a single "Glossary" link; future reference docs appear automatically. Never hardcode a specific reference path in the lesson route.
+
+A reference page renders: a `← Module` anchor to `/topics/<topic>`, an `<h1>{title}</h1>` (so the body should **not** duplicate a `# Title` heading), the doc's `<Content />`, and the same lesson-style "ask your agent" info alert. Reference docs are **not** an ordered sequence, so there is no prev/next nav among them and no `/reference` index page — add an index later only when a second reference doc lands.
 
 ## `NOTES.md`
 
