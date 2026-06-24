@@ -1,0 +1,178 @@
+---
+title: "Trigonometry Refresher: sin, cos, atan2"
+description: "The unit circle in one screen: how an angle becomes a direction vector and back again — radians, degrees, and the raylib y-down gotcha."
+draft: false
+slug: 0003-trigonometry-angles
+publicatedAt: 2026-06-23
+---
+
+import UnitCircle from '../../../components/UnitCircle.astro';
+import Quiz from '../../../components/Quiz.astro';
+
+In [lesson 2](./0002-vector-operations) you normalized a vector to get a *direction
+of length 1*. Sometimes you don't start from a vector, though — you start from an
+**angle**. "The turret fires in this direction," "the sprite faces 30°," "spread
+five bullets across a 40° arc." That's trigonometry, and this lesson is the whole
+of it you need for a 2D shooter: **an angle ↔ a unit vector**, both ways.
+
+## The unit circle: angle as position
+
+Picture a circle of radius 1 centred at the origin. Walk out along the **+x axis**
+and start rotating counter-clockwise. After rotating by angle **θ** you land at a
+point on the circle. The coordinates of that point **are** the trig functions:
+
+- **`cos θ`** is the **x** coordinate.
+- **`sin θ`** is the **y** coordinate.
+
+That's the entire geometric meaning. `cos` and `sin` are not mysterious curves —
+they read off the x and y of a point one radius away from the origin, after you've
+turned through θ. Drag the dot and watch the projections land on each axis:
+
+<UnitCircle size={340} units={1.4} initialDeg={35} />
+
+Three things to internalise by dragging:
+
+1. **At θ = 0°** the point sits at `(1, 0)` — `cos 0 = 1`, `sin 0 = 0`.
+2. **At θ = 90°** it sits at `(0, 1)` — `cos 90 = 0`, `sin 90 = 1`.
+3. **At θ = 180°** it sits at `(-1, 0)` — the vector flips back along -x.
+
+So the direction vector for any angle is just
+`(cos θ, sin θ)` — a **unit vector**, because the circle has radius 1. Notice this
+is exactly the "normalize to length 1" idea from last lesson, arrived at from the
+angle side.
+
+## Radians vs degrees — pick one, know which
+
+Angles come in two units:
+
+- **Degrees**: a full turn is `360`. Human-friendly, what your slider shows.
+- **Radians**: a full turn is `2π ≈ 6.283`. What **every** math function in code
+  actually expects.
+
+**raylib and Odin's `core:math` both want radians.** This is the #1 bug source for
+rusty learners: you compute `30°`, hand it to `math.sin` directly, and get a
+nonsense direction because the function treated `30` as *thirty radians* (~1719°).
+
+Convert at the boundary and never mix:
+
+```odin
+import "core:math"
+
+deg  :: 30.0
+rad  :: deg * math.DEG_TO_RAD         // ≈ 0.5236 rad
+dx   :: math.cos(rad)                 //  cos 30° ≈ 0.866
+dy   :: math.sin(rad)                 //  sin 30° ≈ 0.500
+// math.RAD_TO_DEG goes the other way.
+```
+
+> raylib-odin exposes `rl.DEG_TO_RAD` / `rl.RAD_TO_DEG` too (`raymath`'s
+> constants). Use whichever you already imported.
+
+## Angle → vector: the direction you face
+
+Putting it together — a function that turns an angle into a facing direction:
+
+```odin
+direction_for :: proc(angle_rad: f32) -> rl.Vector2 {
+    return rl.Vector2{ x: f32(math.cos(angle_rad)), y: f32(math.sin(angle_rad)) }
+}
+```
+
+This is what you'll use to spawn bullets, point a torch, or fan out a shotgun
+spread. Speaking of which:
+
+## Your win: a bullet spread
+
+A shotgun that fires `N` bullets across an `arc_deg` cone, centred on `facing_rad`:
+
+```odin
+// fire a fan of `count` bullets from `origin`, aimed along `facing_rad`,
+// spread across `spread_deg` total.
+fire_spread :: proc(origin: rl.Vector2, facing_rad: f32, count: int, spread_deg: f32, speed: f32) {
+    half   := (spread_deg * 0.5) * rl.DEG_TO_RAD
+    start  := facing_rad - half
+    step_v := (spread_deg * rl.DEG_TO_RAD) / f32(max(count - 1, 1))
+    for i in 0..<count {
+        a   := start + f32(i) * step_v
+        dir := rl.Vector2{ x: f32(math.cos(a)), y: f32(math.sin(a)) }
+        spawn_bullet(origin, rl.Vector2Scale(dir, speed))
+    }
+}
+```
+
+Read it once with the unit circle in mind: each `a` is one spoke of the fan, and
+`(cos a, sin a)` is the unit-length heading for that spoke. Scale by `speed` and
+you've got velocity. You just wrote a spread weapon from trig alone.
+
+## Vector → angle: `atan2` gets you back
+
+The reverse direction is just as common — "the player is *there*, what angle do
+I rotate the enemy sprite to?" Given a target vector `(x, y)`, the angle it makes
+with +x is:
+
+```
+θ = atan2(y, x)
+```
+
+Note the argument order: **`y` first, then `x`.** That's not a typo — `atan2` takes
+`(y, x)` so it can disambiguate quadrants that plain `atan(y/x)` cannot. Reversing
+them is the second-most-common trig bug.
+
+```odin
+to_player := rl.Vector2Subtract(player.pos, enemy.pos)
+facing    :: f32(math.atan2(to_player.y, to_player.x))   // y, x!
+```
+
+`atan2` returns radians in `(-π, π]`: positive for points above the x-axis (in
+math convention), negative below. Pass it straight back into `cos` / `sin` and you
+recover the same unit vector — round-trip clean.
+
+## The raylib y-down gotcha (read this twice)
+
+The unit circle above uses **math convention: +y points up**, so `sin 90° = +1`
+means "up" on the diagram. **raylib's screen +y points down.** When you take a
+math-space direction `(cos θ, sin θ)` and draw it on screen, positive `sin`
+*descends* toward the bottom of the window.
+
+Two safe habits:
+
+1. Stay in screen space end-to-end. Compute your target vector in **screen
+   pixels** and feed *that* to `atan2(target.y - source.y, target.x - source.x)`.
+   Screen y is down for both endpoints, so the sign flip cancels out and the
+   angle it returns is correct *for placing things on screen*.
+2. Only when you must mix a math-space angle with screen drawing, apply the flip
+   explicitly: `screen_y = anchor.y - math.sin(θ) * r` (note the minus).
+
+The lesson's `UnitCircle` ruler above is the only place we'll draw the circle
+y-up; from here on, think in screen pixels like the code does.
+
+<Quiz
+  question="Your bullet must travel at exactly 120° from +x. Which call gives its unit direction in Odin?"
+  options={["Vector2 cos0 sin0", "Vector2 cos120 sin120", "Vector2 cos of 2.094", "Vector2 sin of 2.094"]}
+  answer={2}
+  explain="120° must be converted to radians (120 * π/180 ≈ 2.094) before cos/sin. cos(2.094) ≈ -0.5, sin(2.094) ≈ 0.866 — the unit vector, automatically. Raw cos(120) treats 120 as 120 radians."
+/>
+
+<Quiz
+  question="An enemy needs the angle toward the player. Which expression is correct?"
+  options={["atan2 dx then dy", "atan2 dy then dx", "atan of dy times dx", "atan dy over zero"]}
+  answer={1}
+  explain="atan2 takes (y, x) — dy first, then dx. Getting this backwards rotates the sprite to a mirror of where it should face."
+/>
+
+## Sources
+
+- Primary intuition: [Freya Holmer — _Math for Game Devs_, "Angles & Trigonometry"](https://www.youtube.com/playlist?list=PLImQqTpkuLuaI3lvMR6eg3xQm5MBl5zQb) — the unit-circle-as-projection picture is hers.
+- Gentle refresher: [BetterExplained — "Intuitive Trigonometry"](https://betterexplained.com/articles/intuitive-trigonometry/) — rebuilds sin/cos without rote tables; recommended if dragging the circle above still feels shaky.
+- API: [Odin `core:math`](https://pkg.odin-lang.org/core/math/) for `sin`, `cos`, `atan2`, `DEG_TO_RAD`, `RAD_TO_DEG`, `PI`, `TAU`; raylib-odin `rl.Vector2*` and `rl.DEG_TO_RAD` for screen-side calls.
+
+## Next
+
+Lesson 4 puts all three tools — `cos`/`sin`, `atan2`, and `Vector2Rotate` — to work
+on the thing your game actually needs: **rotating a sprite to face the mouse** and
+facing the player's bullets along the aim stick. Tell your agent when you're ready.
+
+Stuck on the unit circle, the radians/degrees switch, or `atan2`'s argument order?
+Ask your agent — it can hand-draw another angle, walk through `atan2` quadrant by
+quadrant, or slow down if `cos`/`sin` still feel like memorisation instead of
+"read the x, read the y".

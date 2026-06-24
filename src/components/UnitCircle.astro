@@ -1,0 +1,374 @@
+---
+// Reusable interactive unit circle for trig lessons.
+//
+// Drag the handle (or use the slider / snap buttons) to set an angle θ. The
+// component draws the unit circle, the radius vector at θ, an angle arc, and
+// dashed projections onto the axes — making cosθ = x and sinθ = y visible.
+//
+// Coordinate convention: math (y **up**), so the unit circle reads the way it
+// does in any textbook. A callout reminds the reader that raylib's screen
+// y goes **down** — the bit you'll trip on when you apply this in code.
+//
+// Reused by:
+//   - lesson 3 (trig refresher: sin/cos, radians, atan2)
+//   - lesson 4 (rotation & facing)
+type Props = {
+  size?: number
+  units?: number
+  initialDeg?: number
+}
+const { size = 340, units = 1.4, initialDeg = 35 } = Astro.props
+---
+
+<unit-circle
+  data-size={size}
+  data-units={units}
+  data-initial-deg={initialDeg}
+>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 not-prose my-6 p-4 rounded-box border border-base-content/15 bg-base-200/30">
+    <div class="uc-svg flex flex-col items-center justify-center">
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        width="100%"
+        style={`max-width:${size}px; aspect-ratio:1;`}
+        class="uc-canvas rounded-box bg-base-100/40"
+        role="img"
+        aria-label="Interactive unit circle: drag the dot to change the angle"
+      >
+        <defs>
+          <marker
+            class="uc-arrowhead"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"></path>
+          </marker>
+        </defs>
+        <g class="uc-draw"></g>
+      </svg>
+      <p class="text-xs text-base-content/50 mt-2 text-center">Drag the dot · math convention (y up)</p>
+    </div>
+
+    <div class="flex flex-col gap-3 justify-center">
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div class="stat-like p-2 rounded-box bg-base-100/50 border border-base-content/10">
+          <div class="text-base-content/50 text-xs">angle (rad)</div>
+          <div class="font-mono text-lg uc-rad">0.611</div>
+        </div>
+        <div class="p-2 rounded-box bg-base-100/50 border border-base-content/10">
+          <div class="text-base-content/50 text-xs">angle (deg)</div>
+          <div class="font-mono text-lg uc-deg">35.0°</div>
+        </div>
+        <div class="p-2 rounded-box bg-base-100/50 border border-base-content/10">
+          <div class="text-base-content/50 text-xs">cosθ → x</div>
+          <div class="font-mono text-lg uc-cos" style="color: var(--color-primary)">0.819</div>
+        </div>
+        <div class="p-2 rounded-box bg-base-100/50 border border-base-content/10">
+          <div class="text-base-content/50 text-xs">sinθ → y</div>
+          <div class="font-mono text-lg uc-sin" style="color: var(--color-primary)">0.574</div>
+        </div>
+      </div>
+
+      <div class="rounded-box bg-base-100/50 border border-base-content/10 p-3 font-mono text-xs">
+        <div class="text-base-content/60">// dir = (cosθ, sinθ)</div>
+        <div>rl.Vector2&#123; x: <span class="uc-cos-code">0.819</span>, y: <span class="uc-sin-code">0.574</span> &#125;</div>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <input
+          type="range"
+          min="0"
+          max="360"
+          step="1"
+          value={initialDeg}
+          class="range range-sm range-primary uc-slider"
+          aria-label="angle in degrees"
+        />
+        <div class="flex gap-1 flex-wrap">
+          <button type="button" class="btn btn-xs btn-ghost uc-snap" data-deg="0">0°</button>
+          <button type="button" class="btn btn-xs btn-ghost uc-snap" data-deg="90">90°</button>
+          <button type="button" class="btn btn-xs btn-ghost uc-snap" data-deg="180">180°</button>
+          <button type="button" class="btn btn-xs btn-ghost uc-snap" data-deg="270">270°</button>
+        </div>
+      </div>
+
+      <p class="text-xs text-base-content/60 leading-relaxed">
+        <span class="font-medium">raylib gotcha:</span> screen y points <em>down</em>, so this
+        math-y <em>up</em> becomes <em>down</em> in your window. When you place a thing at
+        <code>(cosθ, sinθ)</code> on screen, positive sin moves it toward the bottom — flip the
+        sign or compute with <code>atan2(dy, dx)</code> in screen coords directly.
+      </p>
+    </div>
+  </div>
+</unit-circle>
+
+<script>
+import { query, queryAll, selectIn } from '@vyke/dom'
+import van from 'vanjs-core'
+import { assert } from '../lib/errors'
+import { circle, g, line, path, text } from './elements'
+
+// Module-level counter for unique arrowhead marker ids.
+let ucSeq = 0
+
+const COL = {
+  radius: 'var(--color-primary, oklch(0.7 0.18 330))',
+  xProj: 'oklch(0.7 0.18 30)',
+  yProj: 'oklch(0.65 0.16 220)',
+  circle: 'var(--color-base-content, #888)',
+  arc: 'var(--color-primary, oklch(0.7 0.18 330))',
+  handle: 'var(--color-primary, oklch(0.7 0.18 330))',
+}
+
+customElements.define('unit-circle', class extends HTMLElement {
+  #ready = false
+  connectedCallback(): void {
+    if (this.#ready) {
+      return
+    }
+    this.#ready = true
+
+    const [canvas, draw, marker, rad, deg, cos, sin, cosCode, sinCode, slider, snaps] = selectIn(this,
+      query<SVGElement>('.uc-canvas'),
+      query<SVGGElement>('.uc-draw'),
+      query<SVGMarkerElement>('marker.uc-arrowhead'),
+      query<HTMLElement>('.uc-rad'),
+      query<HTMLElement>('.uc-deg'),
+      query<HTMLElement>('.uc-cos'),
+      query<HTMLElement>('.uc-sin'),
+      query<HTMLElement>('.uc-cos-code'),
+      query<HTMLElement>('.uc-sin-code'),
+      query<HTMLInputElement>('.uc-slider'),
+      queryAll<HTMLButtonElement>('.uc-snap'),
+    )
+
+    assert(canvas && draw, 'UnitCircle: canvas/draw missing')
+
+    const px = Number(this.dataset.size)
+    const units = Number(this.dataset.units)
+    const initialDeg = Number(this.dataset.initialDeg)
+    const cx = px / 2
+    const cy = px / 2
+    const pxPerUnit = (px / 2 - 18) / units
+    const unitR = pxPerUnit // unit circle radius in px
+
+    // math-convention y-up: flip y when going to screen.
+    const toScreen = (gx: number, gy: number) => ({
+      x: cx + gx * pxPerUnit,
+      y: cy - gy * pxPerUnit,
+    })
+
+    const markerId = `uc-ah-${ucSeq++}`
+    marker?.setAttribute('id', markerId)
+
+    // Angle state in radians. Sourced-of-truth: dragging, slider, snaps.
+    const angle = van.state<number>(initialDeg * Math.PI / 180)
+
+    // ---- static decorations (grid + axes + unit circle) ----
+    const grid: SVGGElement = g({ stroke: 'currentColor', class: 'text-base-content/10', strokeWidth: 1 })
+    for (let i = -Math.ceil(units); i <= Math.ceil(units); i++) {
+      const sx1 = toScreen(i, 0)
+      const sx2 = toScreen(i, units)
+      grid.appendChild(line({ x1: sx1.x, y1: 0, x2: sx2.x, y2: px }))
+      const sy1 = toScreen(0, i)
+      const sy2 = toScreen(units, i)
+      grid.appendChild(line({ x1: 0, y1: sy1.y, x2: px, y2: sy2.y }))
+    }
+    const axes = g({ stroke: 'currentColor', class: 'text-base-content/40', strokeWidth: 1.5 }, [
+      line({ x1: 0, y1: cy, x2: px, y2: cy }),
+      line({ x1: cx, y1: 0, x2: cx, y2: px }),
+    ])
+    const axesLabels = g({}, [
+      text({ 'x': px - 6, 'y': cy - 4, 'font-size': 10, 'text-anchor': 'end', 'class': 'fill-base-content/50' }, '+x'),
+      text({ 'x': cx + 4, 'y': 10, 'font-size': 10, 'class': 'fill-base-content/50' }, '+y'),
+    ])
+    const unitCircle = circle({
+      cx, cy, r: unitR,
+      fill: 'none',
+      style: `fill: none; stroke: ${COL.circle}; stroke-width: 1.5; stroke-dasharray: 4 3;`,
+    })
+
+    // ---- reactive decoration ----
+    // Computed angle snapshot feeding the radius arc.
+    function buildArcPath(theta: number): string {
+      const r_a = 0.35 // arc radius in math units
+      const n = 24
+      let d = ''
+      for (let i = 0; i <= n; i++) {
+        const t = i / n
+        const a = theta * t
+        const gx = r_a * Math.cos(a)
+        const gy = r_a * Math.sin(a)
+        const s = toScreen(gx, gy)
+        d += `${i === 0 ? 'M' : 'L'}${s.x},${s.y} `
+      }
+      return d
+    }
+
+    const arcPath = path({
+      d: () => buildArcPath(angle.val),
+      fill: 'none',
+      style: () => `fill: none; stroke: ${COL.arc}; stroke-width: 2;`,
+    })
+
+    const arcLabel = text({
+      'x': () => toScreen(Math.cos(angle.val * 0.5) * 0.48, Math.sin(angle.val * 0.5) * 0.48).x,
+      'y': () => toScreen(Math.cos(angle.val * 0.5) * 0.48, Math.sin(angle.val * 0.5) * 0.48).y - 4,
+      'font-size': 12,
+      'font-family': 'monospace',
+      'style': () => `fill: ${COL.arc}; pointer-events: none;`,
+    }, 'θ')
+
+    const radiusArrow = line({
+      'x1': cx,
+      'y1': cy,
+      'x2': () => toScreen(Math.cos(angle.val), Math.sin(angle.val)).x,
+      'y2': () => toScreen(Math.cos(angle.val), Math.sin(angle.val)).y,
+      'stroke': COL.radius,
+      'style': `stroke: ${COL.radius};`,
+      'stroke-width': 3,
+      'stroke-linecap': 'round',
+      'marker-end': `url(#${markerId})`,
+    })
+
+    // projections: vertical (handle -> x-axis) for cos; horizontal (handle -> y-axis) for sin.
+    const projX = line({
+      'x1': () => toScreen(Math.cos(angle.val), 0).x,
+      'y1': () => toScreen(Math.cos(angle.val), 0).y,
+      'x2': () => toScreen(Math.cos(angle.val), Math.sin(angle.val)).x,
+      'y2': () => toScreen(Math.cos(angle.val), Math.sin(angle.val)).y,
+      'style': `stroke: ${COL.xProj}; stroke-width: 2.5; stroke-linecap: round;`,
+      'stroke-dasharray': '5 4',
+    })
+    const projY = line({
+      'x1': () => toScreen(0, Math.sin(angle.val)).x,
+      'y1': () => toScreen(0, Math.sin(angle.val)).y,
+      'x2': () => toScreen(Math.cos(angle.val), Math.sin(angle.val)).x,
+      'y2': () => toScreen(Math.cos(angle.val), Math.sin(angle.val)).y,
+      'style': `stroke: ${COL.yProj}; stroke-width: 2.5; stroke-linecap: round;`,
+      'stroke-dasharray': '5 4',
+    })
+
+    const xMark = circle({
+      cx: () => toScreen(Math.cos(angle.val), 0).x,
+      cy: () => toScreen(Math.cos(angle.val), 0).y,
+      r: 4,
+      style: `fill: ${COL.xProj};`,
+    })
+    const xMarkLabel = text({
+      'x': () => toScreen(Math.cos(angle.val), 0).x + 8,
+      'y': () => toScreen(Math.cos(angle.val), 0).y - 6,
+      'font-size': 11,
+      'font-family': 'monospace',
+      'style': () => `fill: ${COL.xProj}; pointer-events: none;`,
+    }, () => `cos θ = ${(Math.cos(angle.val)).toFixed(2)}`)
+
+    const yMark = circle({
+      cx: () => toScreen(0, Math.sin(angle.val)).x,
+      cy: () => toScreen(0, Math.sin(angle.val)).y,
+      r: 4,
+      style: `fill: ${COL.yProj};`,
+    })
+    const yMarkLabel = text({
+      'x': () => toScreen(0, Math.sin(angle.val)).x + 8,
+      'y': () => toScreen(0, Math.sin(angle.val)).y + 4,
+      'font-size': 11,
+      'font-family': 'monospace',
+      'style': () => `fill: ${COL.yProj}; pointer-events: none;`,
+    }, () => `sin θ = ${(Math.sin(angle.val)).toFixed(2)}`)
+
+    const handle = circle({
+      'cx': () => toScreen(Math.cos(angle.val), Math.sin(angle.val)).x,
+      'cy': () => toScreen(Math.cos(angle.val), Math.sin(angle.val)).y,
+      'r': 9,
+      'data-handle': 'angle',
+      'tabindex': 0,
+      'style': () => `fill: ${COL.handle}; stroke: var(--color-base-100,#fff); stroke-width: 2px; cursor: grab;`,
+    })
+
+    van.add(draw, grid, axes, axesLabels, unitCircle,
+      projX, projY, arcPath, arcLabel, xMark, yMark, xMarkLabel, yMarkLabel,
+      radiusArrow, handle)
+
+    // ---- readout wiring ----
+    function updateReadout() {
+      const a = angle.val
+      // display angle normalised to [0, 2π) for rad; deg in [0, 360)
+      let aPos = a
+      aPos = ((aPos % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+      const degs = aPos * 180 / Math.PI
+      const c = Math.cos(a)
+      const s = Math.sin(a)
+      if (rad)
+        rad.textContent = `${aPos.toFixed(3)}`
+      if (deg)
+        deg.textContent = `${degs.toFixed(1)}°`
+      if (cos)
+        cos.textContent = c.toFixed(3)
+      if (sin)
+        sin.textContent = s.toFixed(3)
+      if (cosCode)
+        cosCode.textContent = c.toFixed(3)
+      if (sinCode)
+        sinCode.textContent = s.toFixed(3)
+    }
+    // use van.derive so it tracks reactively via DOM imperatively:
+    van.derive(updateReadout)
+
+    // ---- interactions ----
+    if (slider) {
+      slider.addEventListener('input', (e: Event) => {
+        const t = e.target as HTMLInputElement
+        angle.val = Number(t.value) * Math.PI / 180
+      })
+      // keep slider in sync with drag/snap
+      van.derive(() => {
+        const aPos = ((angle.val % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+        if (slider) {
+          slider.value = String(Math.round(aPos * 180 / Math.PI))
+        }
+      })
+    }
+    for (const btn of snaps) {
+      btn.addEventListener('click', () => {
+        const d = Number(btn.dataset.deg)
+        angle.val = d * Math.PI / 180
+      })
+    }
+
+    let dragging = false
+    const pointerToAngle = (e: PointerEvent): number => {
+      const rect = canvas!.getBoundingClientRect()
+      const sxp = ((e.clientX - rect.left) / rect.width) * px
+      const syp = ((e.clientY - rect.top) / rect.height) * px
+      // math coords (y up)
+      const gx = (sxp - cx) / pxPerUnit
+      const gy = (cy - syp) / pxPerUnit
+      return Math.atan2(gy, gx)
+    }
+    canvas!.addEventListener('pointerdown', (e) => {
+      const tgt = e.target as Element
+      if (tgt.getAttribute?.('data-handle') === 'angle') {
+        dragging = true
+        canvas!.setPointerCapture(e.pointerId)
+      }
+    })
+    canvas!.addEventListener('pointermove', (e) => {
+      if (!dragging) {
+        return
+      }
+      angle.val = pointerToAngle(e)
+    })
+    const endDrag = (e: PointerEvent) => {
+      dragging = false
+      canvas!.releasePointerCapture?.(e.pointerId)
+    }
+    canvas!.addEventListener('pointerup', endDrag)
+    canvas!.addEventListener('pointercancel', endDrag)
+  }
+})
+</script>
