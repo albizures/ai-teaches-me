@@ -8,14 +8,11 @@ resolved; update a row the moment its meaning shifts.
 
 ### Static diagram
 
-An SVG figure rendered **server-side** from declarative props (vector list,
-units, caption, …), with **no client script and no runtime state**. It _shows_
+An SVG figure from declarative props (vector list, units, caption, …). It _shows_
 a vector relationship once, the way a figure in a textbook does. It does not
 react to the learner.
 
 - Canonical component: `src/components/VectorGrid.astro`.
-- Lifecycle: SSR-only; the markup is final at build time.
-- Does **not** use vanjs. (See [Interactive playground](#interactive-playground).)
 
 ### Interactive playground
 
