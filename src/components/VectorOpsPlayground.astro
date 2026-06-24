@@ -40,12 +40,13 @@ const { size = 340, units = 5 } = Astro.props
 <script>
 import type { State as VanState } from 'vanjs-core'
 import type { Vec } from '../lib/vec'
-import type { Op, ViewCtx } from './vector-ops/views'
+import type { Op, ViewCtx } from './VectorElements'
 import { on, query, queryAll, selectIn } from '@vyke/dom'
 import van from 'vanjs-core'
 import { assert } from '../lib/errors'
 import { clamp, vec } from '../lib/vec'
-import { circle, defs, div, g, input, label, marker, p, path, span, text } from './elements'
+import { defs, div, g, input, label, marker, p, path, span } from './elements'
+import { Circle } from './VectorCircle'
 import {
   Readout,
   ResultAdd,
@@ -53,7 +54,8 @@ import {
   ResultNormalize,
   ResultScale,
   ResultSubtract,
-} from './vector-ops/views'
+} from './VectorElements'
+import { VectorLabel } from './VectorLabel'
 
 const COL = {
   a: 'oklch(0.7 0.18 30 / 0.5)', // warm (A)
@@ -71,12 +73,13 @@ let vopSeq = 0
 const STAGE_MARGIN_PX = 18
 
 customElements.define('vector-ops-playground', class extends HTMLElement {
+  #ready = false
   connectedCallback(): void {
-    if (this.dataset.init) {
+    if (this.#ready) {
       return
     }
+    this.#ready = true
 
-    this.dataset.init = 'true'
     const [addDiv, subtrackDiv, scaleDiv, normalizeDiv, distanceDiv, cartesianPlane, tabs] = selectIn(this,
       query<HTMLDivElement>('.add-result'),
       query<HTMLDivElement>('.subtrack-result'),
@@ -93,14 +96,15 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
     const units = Number(this.dataset.units)
     const cx = px / 2
     const cy = px / 2
+    const origin = van.state<Vec>({ x: 0, y: 0 })
     const pxPerUnit = (px / 2 - STAGE_MARGIN_PX) / units
-    const pt = (v: Vec): Vec => ({ x: cx + v.x * pxPerUnit, y: cy + v.y * pxPerUnit })
+    const mapVec = (v: Vec): Vec => ({ x: cx + v.x * pxPerUnit, y: cy + v.y * pxPerUnit })
     const markerId = `vop-ah-${vopSeq++}`
 
     const A = van.state<Vec>(vec(2, 1))
     const B = van.state<Vec>(vec(-1, 2))
     const op = van.state<Op>('add')
-    const k = van.state<number>(2)
+    const k = van.state<number>(0.5)
 
     for (const tab of tabs) {
       on(tab, 'click', (event) => {
@@ -111,7 +115,7 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
       })
     }
 
-    const ctx: ViewCtx = { A, B, op, k, pt, markerId, COL }
+    const ctx: ViewCtx = { A, B, op, k, markerId, COL, unit: units, origin, mapVec }
 
     const scaleOnly = div(
       { class: () => `scale-only mb-3${op.val === 'scale' ? '' : ' hidden'}` },
@@ -125,7 +129,7 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
         min: -3,
         max: 3,
         step: 0.1,
-        value: 2,
+        value: k,
         class: 'range range-sm range-primary',
         oninput(event: Event) {
           const target = event.target
@@ -155,23 +159,26 @@ customElements.define('vector-ops-playground', class extends HTMLElement {
     van.add(normalizeDiv!, Readout('normalize', ctx))
     van.add(distanceDiv!, Readout('distance', ctx))
 
-    const Handle = (atom: VanState<Vec>, which: 'A' | 'B', color: string, glyph: string): SVGGElement => g({},
-      circle({
-        'cx': () => pt(atom.val).x,
-        'cy': () => pt(atom.val).y,
-        'r': 9,
-        'data-handle': which,
-        'tabindex': 0,
-        'style': `fill: ${color}; stroke: var(--color-base-100, #fff); stroke-width: 2px; cursor: grab`,
-      }),
-      text({
-        'x': () => pt(atom.val).x + 11,
-        'y': () => pt(atom.val).y + 4,
-        'font-size': 12,
-        'font-family': 'monospace',
-        'style': `fill: ${color}; pointer-events: none`,
-      }, glyph),
-    )
+    function Handle(atom: VanState<Vec>, which: 'A' | 'B', color: string, label: string) {
+      const labelPos = van.derive(() => ({ x: atom.val.x + 0.1, y: atom.val.y + 0.1 }))
+
+      return g({},
+        Circle({
+          origin: atom,
+          radius: 9,
+          color,
+          handle: which,
+          tabindex: 0,
+          mapVec,
+        }),
+        VectorLabel({
+          pos: labelPos,
+          label,
+          color,
+          mapVec,
+        }),
+      )
+    }
 
     const handlesLayer = g({ class: 'handles-layer', style: 'cursor: grab' },
       Handle(A, 'A', COL.a, 'A'),

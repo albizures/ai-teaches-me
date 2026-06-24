@@ -46,9 +46,7 @@ const px = size
   data-origin={origin}
   data-show-grid={showGrid ? '1' : '0'}
 >
-  <CartesianPlane size={size} units={units} origin={origin} showGrid={showGrid} caption={caption}>
-    <g class="vg-vectors"></g>
-  </CartesianPlane>
+  <CartesianPlane size={size} units={units} origin={origin} showGrid={showGrid} caption={caption} />
 
   {caption && <figcaption class="text-sm text-base-content/60 mt-2 text-center max-w-md">{caption}</figcaption>}
 
@@ -57,9 +55,14 @@ const px = size
 </figure>
 
 <script>
-import type { Stage } from '../lib/svg-stage'
-import { clear, makeStage } from '../lib/svg-stage'
-import { vec } from '../lib/vec'
+import type { Vec } from '../lib/vec'
+import { query, queryAll, selectIn } from '@vyke/dom'
+import van from 'vanjs-core'
+import { assert } from '../lib/errors'
+import { g } from './elements'
+import { VectorArrow } from './VectorArrow'
+import { Circle } from './VectorCircle'
+import { VectorLabel } from './VectorLabel'
 
 type Common = {
   color?: string
@@ -87,13 +90,14 @@ class VectorGrid extends HTMLElement {
     }
     this.#ready = true
 
-    const svg = this.querySelector<SVGSVGElement>('svg')
-    const markers = this.querySelectorAll<SVGMarkerElement>('marker.vg-arrowhead')
-    const layer = this.querySelector<SVGGElement>('.vg-vectors')
-    const propsEl = this.querySelector<HTMLScriptElement>('script.vg-props')
-    if (!svg || !layer || !propsEl || markers.length === 0) {
-      return
-    }
+    const [vectorContainer, markers, propsEl] = selectIn(this,
+      query<SVGGElement>('.vg-vectors'),
+      queryAll<SVGMarkerElement>('marker.vg-arrowhead'),
+      query<HTMLScriptElement>('script.vg-props'),
+    )
+
+    assert(vectorContainer, 'Missing vector container')
+    assert(propsEl, 'Missing props')
 
     const px = Number(this.dataset.size)
     const units = Number(this.dataset.units)
@@ -101,12 +105,12 @@ class VectorGrid extends HTMLElement {
     const cx = origin === 'center' ? px / 2 : 24
     const cy = origin === 'center' ? px / 2 : 24
     const pxPerUnit = (px / 2 - 16) / units
+    const mapVec = (v: Vec): Vec => ({ x: cx + v.x * pxPerUnit, y: cy + v.y * pxPerUnit })
 
     const markerId = `vg-ah-${instanceSeq++}`
     markers.forEach((m) => {
       m.id = markerId
     })
-    const stage: Stage = makeStage(cx, cy, pxPerUnit, markerId)
 
     let parsedPoints: Point[] = []
     let parsedVectors: Vector[] = []
@@ -120,22 +124,39 @@ class VectorGrid extends HTMLElement {
       parsedVectors = []
     }
 
-    clear(layer)
     for (const p of parsedPoints) {
-      // `width` is read as the dot radius in px so authors can size points.
-      stage.point(layer, vec(p.x, p.y), p.color ?? PRIMARY, {
-        label: p.label,
-        radius: p.width ?? 3,
-      })
+      const mapped = van.derive(() => p)
+      const labelPos = van.derive(() => ({ x: mapped.val.x + 11, y: mapped.val.y + 4 }))
+      const color = p.color ?? PRIMARY
+      van.add(vectorContainer, g({},
+        Circle({
+          origin: mapped,
+          radius: 9,
+          color,
+          mapVec,
+        }),
+        VectorLabel({
+          pos: labelPos,
+          label: p.label,
+          color,
+          mapVec,
+        }),
+      ))
     }
     for (const v of parsedVectors) {
-      const from = vec(v.fromX ?? 0, v.fromY ?? 0)
-      const to = vec(v.x, v.y)
-      stage.arrow(layer, from, to, v.color ?? PRIMARY, {
-        width: v.width ?? 2,
-        dashed: v.dashed,
+      const to = van.derive(() => v)
+      const from = van.derive(() => ({
+        x: v.fromX ?? 0, y: v.fromY ?? 0,
+      }))
+
+      const color = v.color ?? PRIMARY
+      van.add(vectorContainer, VectorArrow({
+        mapVec,
+        to, from,
+        color,
         label: v.label,
-      })
+        markerId,
+      }))
     }
   }
 }
